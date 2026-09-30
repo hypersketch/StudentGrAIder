@@ -22,20 +22,20 @@ const HomePage = () => {
         </div>
     );
 
-    const { id, email, username } = user;
+    const { id, email, name } = user;
 
     return (
         <div className="min-h-screen bg-spotify-black flex flex-col items-center justify-center px-4">
             <div className="w-full max-w-md">
                 <div className="bg-spotify-card rounded-2xl shadow-xl p-8 space-y-5">
                     <h1 className="text-2xl font-bold text-white">
-                        Welcome back, <span className="text-spotify-green">{username}</span>
+                        Welcome back, <span className="text-spotify-green">{name}</span>
                     </h1>
 
                     <div className="border-t border-spotify-hover pt-5 space-y-4">
                         <div>
-                            <p className="text-xs uppercase tracking-widest text-spotify-muted mb-1">Username</p>
-                            <p className="text-white font-medium">{username}</p>
+                            <p className="text-xs uppercase tracking-widest text-spotify-muted mb-1">Name</p>
+                            <p className="text-white font-medium">{name}</p>
                         </div>
                         <div>
                             <p className="text-xs uppercase tracking-widest text-spotify-muted mb-1">Email</p>

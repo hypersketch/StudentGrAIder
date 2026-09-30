@@ -5,7 +5,7 @@ import axios from "axios";
 const url = `${process.env.REACT_APP_BACKEND_SERVER_URI}/user/signup`;
 
 const Register = () => {
-  const [formData, setFormData] = useState({ username: "", email: "", password: "" });
+  const [formData, setFormData] = useState({ name: "", email: "", password: "", role: "" });
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
@@ -33,11 +33,11 @@ const Register = () => {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-semibold text-spotify-muted mb-1">Username</label>
+            <label className="block text-sm font-semibold text-spotify-muted mb-1">Name</label>
             <input
               type="text"
-              name="username"
-              placeholder="Enter username"
+              name="name"
+              placeholder="Enter your name"
               onChange={handleChange}
               className="w-full px-4 py-2 rounded-md bg-spotify-hover border border-spotify-hover text-white placeholder-spotify-muted focus:outline-none focus:border-white"
             />
@@ -64,6 +64,41 @@ const Register = () => {
               className="w-full px-4 py-2 rounded-md bg-spotify-hover border border-spotify-hover text-white placeholder-spotify-muted focus:outline-none focus:border-white"
             />
           </div>
+
+          <div>
+  <label className="block text-sm font-semibold text-spotify-muted mb-2">Sign up as a</label>
+  <div className="space-y-3">
+    <label className="flex items-start gap-3 cursor-pointer">
+      <input
+        type="radio"
+        name="role"
+        value="professor"
+        checked={formData.role === "professor"}
+        onChange={handleChange}
+        className="mt-1"
+      />
+      <span>
+        <span className="block text-white font-medium">Professor</span>
+        <span className="block text-xs text-spotify-muted">Create and curate questions to be answered by your students</span>
+      </span>
+    </label>
+    <label className="flex items-start gap-3 cursor-pointer">
+      <input
+        type="radio"
+        name="role"
+        value="student"
+        checked={formData.role === "student"}
+        onChange={handleChange}
+        className="mt-1"
+      />
+      <span>
+        <span className="block text-white font-medium">Student</span>
+        <span className="block text-xs text-spotify-muted">Sign up for your professor's class and take various quizzes</span>
+      </span>
+    </label>
+  </div>
+</div>
+
 
           {error && <p className="text-red-400 text-sm">{error}</p>}
 

@@ -8,16 +8,16 @@ router.post('/signup', async (req, res) => {
     const { error } = userValidation(req.body);
     if (error) return res.status(400).send({ message: error.errors[0].message });
 
-    const { username, email, password } = req.body
+    const { name, email, password, role } = req.body
 
     try {
-        const existingUser = await userModel.findOne({ username })
-        if (existingUser) return res.status(409).send({ message: "Username is taken, pick another" })
+        const existingUser = await userModel.findOne({ email: email.toLowerCase() })
+        if (existingUser) return res.status(409).send({ message: "An account with that email already exists" })
 
         const salt = await bcrypt.genSalt(10)
         const hashedPassword = await bcrypt.hash(password, salt)
 
-        const newUser = new userModel({ username, email, password: hashedPassword })
+        const newUser = new userModel({ name, email, password: hashedPassword, role })
         const savedUser = await newUser.save()
         res.send(savedUser)
     } catch (err) {

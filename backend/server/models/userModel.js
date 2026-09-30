@@ -1,27 +1,40 @@
 const mongoose = require("mongoose");
 
+// id is Mongo's built-in _id
 const userSchema = new mongoose.Schema(
   {
-    username: {
+    name: {
       type: String,
       required: true,
-      unique: true,
+      trim: true,
     },
     email: {
       type: String,
       required: true,
       unique: true,
+      lowercase: true,
+      trim: true,
     },
+    // bcrypt hash, never the plain password
     password: {
-      required: true,
       type: String,
+      required: true,
     },
-    date: {
-      type: Date,
-      default: Date.now,
+    role: {
+      type: String,
+      enum: ['student', 'professor'],
+      required: true,
     },
   },
-  { collection: "users" }
+  { collection: "users", timestamps: { createdAt: true, updatedAt: false } }
 );
+
+// Never send the password hash back in API responses
+userSchema.set('toJSON', {
+  transform: (doc, ret) => {
+    delete ret.password;
+    return ret;
+  },
+});
 
 module.exports = mongoose.model('users', userSchema)

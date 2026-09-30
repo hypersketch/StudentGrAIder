@@ -7,7 +7,7 @@ const url = `${process.env.REACT_APP_BACKEND_SERVER_URI}/user/login`;
 
 const Login = () => {
   const [user, setUser] = useState(null);
-  const [credentials, setCredentials] = useState({ username: "", password: "" });
+  const [credentials, setCredentials] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
@@ -44,11 +44,11 @@ const Login = () => {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-semibold text-spotify-muted mb-1">Username</label>
+            <label className="block text-sm font-semibold text-spotify-muted mb-1">Email</label>
             <input
-              type="text"
-              name="username"
-              placeholder="Enter username"
+              type="email"
+              name="email"
+              placeholder="Enter email"
               onChange={handleChange}
               className="w-full px-4 py-2 rounded-md bg-spotify-hover border border-spotify-hover text-white placeholder-spotify-muted focus:outline-none focus:border-white"
             />
