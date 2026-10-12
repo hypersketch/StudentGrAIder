@@ -1,30 +1,31 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import React, { useState, useCallback } from "react";
+import { useNavigate, Link, Navigate } from "react-router-dom";
 import axios from "axios";
 import getUserInfo from "../../utilities/decodeJwt";
+import Overlay, { overlayInput, overlayLabel, overlaySubmit } from "../overlay";
 
 const url = `${process.env.REACT_APP_BACKEND_SERVER_URI}/user/login`;
 
+// Shown as an overlay on top of the home page (see the /login route in App.js)
 const Login = () => {
-  const [user, setUser] = useState(null);
+  const [user] = useState(() => getUserInfo());
   const [credentials, setCredentials] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
+  const close = useCallback(() => navigate("/"), [navigate]);
+
   const handleChange = ({ currentTarget: input }) => {
     setCredentials({ ...credentials, [input.name]: input.value });
   };
-
-  useEffect(() => {
-    setUser(getUserInfo());
-  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       const { data: res } = await axios.post(url, credentials);
       localStorage.setItem("accessToken", res.accessToken);
-      navigate("/home");
+      // Full reload so every component re-reads the new token
+      window.location.assign("/");
     } catch (error) {
       if (error.response && error.response.status >= 400 && error.response.status <= 500) {
         setError(error.response.data.message);
@@ -32,55 +33,31 @@ const Login = () => {
     }
   };
 
-  if (user) {
-    navigate("/home");
-    return null;
-  }
+  if (user) return <Navigate to="/" replace />;
 
   return (
-    <div className="min-h-screen bg-spotify-black flex items-center justify-center px-4">
-      <div className="bg-spotify-card rounded-2xl shadow-xl p-8 w-full max-w-sm">
-        <h2 className="text-2xl font-bold text-white mb-6 text-center">Log in to Skeleton</h2>
+    <Overlay title="Log in" onClose={close}>
+      <form onSubmit={handleSubmit} className="space-y-4 p-5">
+        <div>
+          <label className={overlayLabel}>Email</label>
+          <input type="email" name="email" placeholder="Enter email" autoFocus onChange={handleChange} className={overlayInput} />
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-semibold text-spotify-muted mb-1">Email</label>
-            <input
-              type="email"
-              name="email"
-              placeholder="Enter email"
-              onChange={handleChange}
-              className="w-full px-4 py-2 rounded-md bg-spotify-hover border border-spotify-hover text-white placeholder-spotify-muted focus:outline-none focus:border-white"
-            />
-          </div>
+        <div>
+          <label className={overlayLabel}>Password</label>
+          <input type="password" name="password" placeholder="Password" onChange={handleChange} className={overlayInput} />
+        </div>
 
-          <div>
-            <label className="block text-sm font-semibold text-spotify-muted mb-1">Password</label>
-            <input
-              type="password"
-              name="password"
-              placeholder="Password"
-              onChange={handleChange}
-              className="w-full px-4 py-2 rounded-md bg-spotify-hover border border-spotify-hover text-white placeholder-spotify-muted focus:outline-none focus:border-white"
-            />
-          </div>
+        {error && <p className="text-red-600 text-sm m-0">{error}</p>}
 
-          {error && <p className="text-red-400 text-sm">{error}</p>}
+        <button type="submit" className={overlaySubmit}>Log In</button>
 
-          <button
-            type="submit"
-            className="w-full py-3 rounded-full bg-spotify-green hover:bg-spotify-green-hover text-black font-bold transition-colors shadow-sm mt-2"
-          >
-            Log In
-          </button>
-        </form>
-
-        <p className="text-center text-sm text-spotify-muted mt-6">
+        <p className="text-center text-sm text-grader-muted m-0">
           Don't have an account?{" "}
-          <Link to="/signup" className="font-semibold text-white hover:text-spotify-green transition-colors">Sign up</Link>
+          <Link to="/signup" replace className="font-bold text-grader-navy">Sign up</Link>
         </p>
-      </div>
-    </div>
+      </form>
+    </Overlay>
   );
 };
 

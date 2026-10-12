@@ -15,6 +15,16 @@ module.exports = {
           hover:   '#333333',
           muted:   '#B3B3B3',
         },
+        // Home page palette (from Homepage.html / HomepageStyle.css)
+        grader: {
+          navy:    '#1d4e89',
+          green:   '#4caf50',
+          mint:    '#77dd77',
+          sidebar: '#f5f5f5',
+          border:  '#cccccc',
+          muted:   '#666666',
+          text:    '#333333',
+        },
       },
     },
   },

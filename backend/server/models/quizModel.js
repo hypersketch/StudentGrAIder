@@ -64,6 +64,9 @@ questionSchema.pre('validate', function (next) {
   if (!this.options || this.options.length < 2) {
     return next(new Error('Multiple choice questions need at least 2 options'));
   }
+  if (this.options.some((o) => !o || !o.trim())) {
+    return next(new Error('Answer options cannot be blank'));
+  }
   if (this.correctOptionIndex == null || this.correctOptionIndex >= this.options.length) {
     return next(new Error('correctOptionIndex must point to one of the options'));
   }

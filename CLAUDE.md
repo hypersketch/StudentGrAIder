@@ -56,4 +56,4 @@ Protected backend routes use `middleware/auth.js`: `verifyToken` (expects `Autho
 - `App.js` — router root, `UserContext.Provider`, navbar wrapper
 - `components/pages/` — one file per route; pages read from `UserContext` or call `getUserInfo()` directly
 - `components/navbar.js` — React Bootstrap navbar; always visible regardless of auth state
-- Frontend makes API calls with `axios` using `process.env.REACT_APP_BACKEND_SERVER_URI` as the base URL
+- Frontend makes API calls with `axios` using `process.env.REACT_APP_BACKEND_SERVER_URI` as the base URL; `utilities/api.js` is a preconfigured instance that adds the `Authorization: Bearer` header for logged-in requests

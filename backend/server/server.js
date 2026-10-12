@@ -3,6 +3,8 @@ const app = express();
 const cors = require('cors')
 const loginRoute = require('./routes/userLogin')
 const registerRoute = require('./routes/userSignUp')
+const classroomsRoute = require('./routes/classrooms')
+const quizzesRoute = require('./routes/quizzes')
 const dbConnection = require('./config/db.config')
 
 // Load every model at startup so Mongoose creates its collection and indexes,
@@ -20,6 +22,8 @@ app.use(cors({origin: '*'}))
 app.use(express.json())
 app.use('/user', loginRoute)
 app.use('/user', registerRoute)
+app.use('/classrooms', classroomsRoute)
+app.use('/classrooms/:classroomId/quizzes', quizzesRoute)
 
 app.listen(SERVER_PORT, (req, res) => {
     console.log(`The backend service is running on port ${SERVER_PORT} and waiting for requests.`);

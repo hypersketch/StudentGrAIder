@@ -1,13 +1,25 @@
-import React, { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import React, { useState, useCallback } from "react";
+import { useNavigate, Link, Navigate } from "react-router-dom";
 import axios from "axios";
+import getUserInfo from "../../utilities/decodeJwt";
+import Overlay, { overlayInput, overlayLabel, overlaySubmit } from "../overlay";
 
 const url = `${process.env.REACT_APP_BACKEND_SERVER_URI}/user/signup`;
+const loginUrl = `${process.env.REACT_APP_BACKEND_SERVER_URI}/user/login`;
 
+const roles = [
+  { value: "professor", label: "Professor", description: "Create and curate questions to be answered by your students" },
+  { value: "student", label: "Student", description: "Sign up for your professor's class and take various quizzes" },
+];
+
+// Shown as an overlay on top of the home page (see the /signup route in App.js)
 const Register = () => {
+  const [user] = useState(() => getUserInfo());
   const [formData, setFormData] = useState({ name: "", email: "", password: "", role: "" });
   const [error, setError] = useState("");
   const navigate = useNavigate();
+
+  const close = useCallback(() => navigate("/"), [navigate]);
 
   const handleChange = ({ currentTarget: input }) => {
     setFormData({ ...formData, [input.name]: input.value });
@@ -17,8 +29,10 @@ const Register = () => {
     e.preventDefault();
     try {
       await axios.post(url, formData);
-      window.alert("Registration successful! Please log in.");
-      navigate("/login");
+      // Log the new user straight in, then reload so every component reads the new token
+      const { data: res } = await axios.post(loginUrl, { email: formData.email, password: formData.password });
+      localStorage.setItem("accessToken", res.accessToken);
+      window.location.assign("/");
     } catch (error) {
       if (error.response && error.response.status >= 400 && error.response.status <= 500) {
         setError(error.response.data.message);
@@ -26,96 +40,63 @@ const Register = () => {
     }
   };
 
+  if (user) return <Navigate to="/" replace />;
+
   return (
-    <div className="min-h-screen bg-spotify-black flex items-center justify-center px-4">
-      <div className="bg-spotify-card rounded-2xl shadow-xl p-8 w-full max-w-sm">
-        <h2 className="text-2xl font-bold text-white mb-6 text-center">Create an account</h2>
+    <Overlay title="Create an account" onClose={close}>
+      <form onSubmit={handleSubmit} className="space-y-4 p-5">
+        <div>
+          <label className={overlayLabel}>Name</label>
+          <input type="text" name="name" placeholder="Enter your name" autoFocus onChange={handleChange} className={overlayInput} />
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-semibold text-spotify-muted mb-1">Name</label>
-            <input
-              type="text"
-              name="name"
-              placeholder="Enter your name"
-              onChange={handleChange}
-              className="w-full px-4 py-2 rounded-md bg-spotify-hover border border-spotify-hover text-white placeholder-spotify-muted focus:outline-none focus:border-white"
-            />
+        <div>
+          <label className={overlayLabel}>Email</label>
+          <input type="email" name="email" placeholder="Enter email" onChange={handleChange} className={overlayInput} />
+        </div>
+
+        <div>
+          <label className={overlayLabel}>Password</label>
+          <input type="password" name="password" placeholder="Password" onChange={handleChange} className={overlayInput} />
+        </div>
+
+        <div>
+          <label className={overlayLabel}>Sign up as a</label>
+          <div className="space-y-2">
+            {roles.map((r) => (
+              <label
+                key={r.value}
+                className={`flex items-start gap-3 cursor-pointer rounded-[3px] border px-3 py-2 ${
+                  formData.role === r.value ? "border-grader-navy bg-blue-50" : "border-grader-border"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="role"
+                  value={r.value}
+                  checked={formData.role === r.value}
+                  onChange={handleChange}
+                  className="mt-1"
+                />
+                <span>
+                  <span className="block text-grader-text font-bold">{r.label}</span>
+                  <span className="block text-xs text-grader-muted">{r.description}</span>
+                </span>
+              </label>
+            ))}
           </div>
+        </div>
 
-          <div>
-            <label className="block text-sm font-semibold text-spotify-muted mb-1">Email</label>
-            <input
-              type="email"
-              name="email"
-              placeholder="Enter email"
-              onChange={handleChange}
-              className="w-full px-4 py-2 rounded-md bg-spotify-hover border border-spotify-hover text-white placeholder-spotify-muted focus:outline-none focus:border-white"
-            />
-          </div>
+        {error && <p className="text-red-600 text-sm m-0">{error}</p>}
 
-          <div>
-            <label className="block text-sm font-semibold text-spotify-muted mb-1">Password</label>
-            <input
-              type="password"
-              name="password"
-              placeholder="Password"
-              onChange={handleChange}
-              className="w-full px-4 py-2 rounded-md bg-spotify-hover border border-spotify-hover text-white placeholder-spotify-muted focus:outline-none focus:border-white"
-            />
-          </div>
+        <button type="submit" className={overlaySubmit}>Register</button>
 
-          <div>
-  <label className="block text-sm font-semibold text-spotify-muted mb-2">Sign up as a</label>
-  <div className="space-y-3">
-    <label className="flex items-start gap-3 cursor-pointer">
-      <input
-        type="radio"
-        name="role"
-        value="professor"
-        checked={formData.role === "professor"}
-        onChange={handleChange}
-        className="mt-1"
-      />
-      <span>
-        <span className="block text-white font-medium">Professor</span>
-        <span className="block text-xs text-spotify-muted">Create and curate questions to be answered by your students</span>
-      </span>
-    </label>
-    <label className="flex items-start gap-3 cursor-pointer">
-      <input
-        type="radio"
-        name="role"
-        value="student"
-        checked={formData.role === "student"}
-        onChange={handleChange}
-        className="mt-1"
-      />
-      <span>
-        <span className="block text-white font-medium">Student</span>
-        <span className="block text-xs text-spotify-muted">Sign up for your professor's class and take various quizzes</span>
-      </span>
-    </label>
-  </div>
-</div>
-
-
-          {error && <p className="text-red-400 text-sm">{error}</p>}
-
-          <button
-            type="submit"
-            className="w-full py-3 rounded-full bg-spotify-green hover:bg-spotify-green-hover text-black font-bold transition-colors shadow-sm mt-2"
-          >
-            Register
-          </button>
-        </form>
-
-        <p className="text-center text-sm text-spotify-muted mt-6">
+        <p className="text-center text-sm text-grader-muted m-0">
           Already have an account?{" "}
-          <Link to="/login" className="font-semibold text-white hover:text-spotify-green transition-colors">Log in</Link>
+          <Link to="/login" replace className="font-bold text-grader-navy">Log in</Link>
         </p>
-      </div>
-    </div>
+      </form>
+    </Overlay>
   );
 };
 
