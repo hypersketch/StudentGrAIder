@@ -5,6 +5,11 @@ import getUserInfo from "../../utilities/decodeJwt";
 import Overlay, { overlayInput, overlayLabel, overlaySubmit } from "../overlay";
 
 const url = `${process.env.REACT_APP_BACKEND_SERVER_URI}/user/login`;
+const devLoginUrl = `${process.env.REACT_APP_BACKEND_SERVER_URI}/user/dev-login`;
+
+// Test-login buttons only show with `npm start`, never in a production build.
+// The backend also needs ENABLE_DEV_LOGIN=true in its .env.
+const SHOW_TEST_LOGINS = process.env.NODE_ENV === "development";
 
 // Shown as an overlay on top of the home page (see the /login route in App.js)
 const Login = () => {
@@ -33,6 +38,18 @@ const Login = () => {
     }
   };
 
+  const handleTestLogin = async (role) => {
+    try {
+      const { data: res } = await axios.post(devLoginUrl, { role });
+      localStorage.setItem("accessToken", res.accessToken);
+      window.location.assign("/");
+    } catch (error) {
+      if (!error.response) setError("Couldn't reach the backend. Is it running?");
+      else if (error.response.status === 404) setError("Test logins are off. Add ENABLE_DEV_LOGIN=true to backend/server/.env and restart the backend.");
+      else setError(`Test login failed: ${error.response.data?.message || `server error ${error.response.status}`}`);
+    }
+  };
+
   if (user) return <Navigate to="/" replace />;
 
   return (
@@ -56,6 +73,24 @@ const Login = () => {
           Don't have an account?{" "}
           <Link to="/signup" replace className="font-bold text-grader-navy">Sign up</Link>
         </p>
+
+        {SHOW_TEST_LOGINS && (
+          <div className="border-t border-dashed border-grader-border pt-3">
+            <p className="text-xs uppercase tracking-wider text-grader-muted text-center mb-2">Testing only</p>
+            <div className="grid grid-cols-2 gap-2">
+              {["professor", "student"].map((role) => (
+                <button
+                  key={role}
+                  type="button"
+                  onClick={() => handleTestLogin(role)}
+                  className="py-1.5 rounded-[3px] border border-grader-navy text-grader-navy text-sm font-bold hover:bg-grader-navy hover:text-white"
+                >
+                  Test {role}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </form>
     </Overlay>
   );

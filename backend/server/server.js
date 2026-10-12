@@ -25,6 +25,12 @@ app.use('/user', registerRoute)
 app.use('/classrooms', classroomsRoute)
 app.use('/classrooms/:classroomId/quizzes', quizzesRoute)
 
+// Test-only one-click logins; set ENABLE_DEV_LOGIN=true in .env to turn them on. Never enable in production.
+if (process.env.ENABLE_DEV_LOGIN === 'true') {
+    app.use('/user', require('./routes/devLogin'))
+    console.log('Test logins are ON (POST /user/dev-login). Do not use this setting in production.')
+}
+
 app.listen(SERVER_PORT, (req, res) => {
     console.log(`The backend service is running on port ${SERVER_PORT} and waiting for requests.`);
 })
