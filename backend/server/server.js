@@ -5,6 +5,7 @@ const loginRoute = require('./routes/userLogin')
 const registerRoute = require('./routes/userSignUp')
 const classroomsRoute = require('./routes/classrooms')
 const quizzesRoute = require('./routes/quizzes')
+const attemptsRoute = require('./routes/attempts')
 const dbConnection = require('./config/db.config')
 
 // Load every model at startup so Mongoose creates its collection and indexes,
@@ -24,6 +25,7 @@ app.use('/user', loginRoute)
 app.use('/user', registerRoute)
 app.use('/classrooms', classroomsRoute)
 app.use('/classrooms/:classroomId/quizzes', quizzesRoute)
+app.use('/classrooms/:classroomId/quizzes/:quizId/attempts', attemptsRoute)
 
 // Test-only one-click logins; set ENABLE_DEV_LOGIN=true in .env to turn them on. Never enable in production.
 if (process.env.ENABLE_DEV_LOGIN === 'true') {

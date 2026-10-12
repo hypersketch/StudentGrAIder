@@ -8,6 +8,7 @@ import HomePage from "./components/pages/homePage";
 import Login from "./components/pages/loginPage";
 import Signup from "./components/pages/registerPage";
 import QuizMakerPage from "./components/pages/quizMakerPage";
+import TakeQuizPage from "./components/pages/takeQuizPage";
 import { createContext, useState, useEffect } from "react";
 import getUserInfo from "./utilities/decodeJwt";
 
@@ -31,6 +32,7 @@ const App = () => {
         <Route exact path="/signup" element={<><HomePage /><Signup /></>} />
         <Route exact path="/classes/:classId/quizzes/new" element={<QuizMakerPage />} />
         <Route exact path="/classes/:classId/quizzes/:quizId" element={<QuizMakerPage />} />
+        <Route exact path="/classes/:classId/quizzes/:quizId/take" element={<TakeQuizPage />} />
       </Routes>
     </UserContext.Provider>
   );

@@ -7,6 +7,14 @@ import Overlay, { overlayInput, overlayLabel, overlaySubmit } from '../overlay';
 const headerButton = 'ml-2.5 px-2.5 py-1.5 rounded-[3px] bg-grader-green text-white text-sm no-underline hover:text-white';
 const card = 'border border-grader-text rounded-md p-[15px] mb-[15px] bg-white';
 
+// What a student sees on a quiz card, from the myAttempt summary the quiz list returns
+const attemptLabel = (attempt) => {
+    if (!attempt) return 'Take quiz →';
+    if (attempt.status === 'in_progress') return 'Resume →';
+    const score = `${attempt.totalScoreAwarded} / ${attempt.totalPointsPossible} pts`;
+    return attempt.status === 'graded' ? score : `${score} · awaiting grading`;
+};
+
 // The site's front page. Logged-out visitors see the same layout with
 // Log In / Sign Up buttons in place of their classes and quizzes.
 // The selected class lives in the URL (?class=<id>) so it survives coming back from the quiz maker.
@@ -181,25 +189,21 @@ const HomePage = () => {
                                                     {q.timeLimitMinutes ? ` · ${q.timeLimitMinutes} min` : ''}
                                                 </span>
                                                 {!isProfessor && (
-                                                    <span>
-                                                        <span className="bg-grader-mint text-black text-[0.8em] px-2 py-1 rounded-[3px] ml-[5px]">AI:--</span>
-                                                        <span className="bg-grader-mint text-black text-[0.8em] px-2 py-1 rounded-[3px] ml-[5px]">P:--</span>
-                                                    </span>
+                                                    <span className="text-sm font-bold text-grader-navy">{attemptLabel(q.myAttempt)}</span>
                                                 )}
                                             </div>
                                         </>
                                     );
-                                    // Professors open the quiz to view or edit it
-                                    return isProfessor ? (
+                                    // Professors open the quiz to view or edit it; students to take it or see their results
+                                    const quizUrl = `/classes/${selectedClass._id}/quizzes/${q._id}${isProfessor ? '' : '/take'}`;
+                                    return (
                                         <Link
                                             key={q._id}
-                                            to={`/classes/${selectedClass._id}/quizzes/${q._id}`}
+                                            to={quizUrl}
                                             className={`${card} block no-underline text-grader-text hover:border-grader-navy hover:shadow-md`}
                                         >
                                             {body}
                                         </Link>
-                                    ) : (
-                                        <div key={q._id} className={card}>{body}</div>
                                     );
                                 })
                             )}

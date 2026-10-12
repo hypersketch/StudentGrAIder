@@ -11,6 +11,7 @@ function buildApp() {
     app.use('/user', require('../routes/userSignUp'));
     app.use('/classrooms', require('../routes/classrooms'));
     app.use('/classrooms/:classroomId/quizzes', require('../routes/quizzes'));
+    app.use('/classrooms/:classroomId/quizzes/:quizId/attempts', require('../routes/attempts'));
     return app;
 }
 
