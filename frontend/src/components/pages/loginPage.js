@@ -63,6 +63,9 @@ const Login = () => {
         <div>
           <label className={overlayLabel}>Password</label>
           <input type="password" name="password" placeholder="Password" onChange={handleChange} className={overlayInput} />
+          <Link to="/forgot-password" replace className="inline-block mt-1 text-xs text-grader-navy font-bold">
+            Forgot password?
+          </Link>
         </div>
 
         {error && <p className="text-red-600 text-sm m-0">{error}</p>}

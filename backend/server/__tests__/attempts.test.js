@@ -1,41 +1,10 @@
-const request = require('supertest');
-const mongoose = require('mongoose');
-const { buildApp, connect, disconnect, clearDB } = require('./testSetup');
-const { generateAccessToken } = require('../utilities/generateToken');
-const classroomModel = require('../models/classroomModel');
-const quizModel = require('../models/quizModel');
+// Taking a quiz: loading it, starting, submitting, and the scores shown on quiz cards
+const {
+    useTestDatabase,
+    request, app, attemptModel, professor, student, otherStudent, outsider, auth, questions, setup, start,
+} = require('./quizFixtures');
 
-const app = buildApp();
-
-beforeAll(async () => { await connect(); });
-afterAll(async () => { await disconnect(); });
-beforeEach(async () => { await clearDB(); });
-
-const tokenFor = (role, id = new mongoose.Types.ObjectId()) =>
-    ({ id, token: generateAccessToken(id, `${role}@example.com`, 'Test', role) });
-
-const professor = tokenFor('professor');
-const student = tokenFor('student');
-const otherStudent = tokenFor('student');
-const outsider = tokenFor('student');
-const auth = ({ token }) => ({ Authorization: `Bearer ${token}` });
-
-const questions = [
-    { type: 'multiple_choice', text: '2 + 2?', options: ['3', '4', '5'], correctOptionIndex: 1, points: 2 },
-    { type: 'true_false', text: 'The sky is green', correctOptionIndex: 1, points: 1 },
-    { type: 'open_response', text: 'Explain gravity', sampleAnswer: 'Mass attracts mass', points: 5 },
-];
-
-// A class with `student` and `otherStudent` enrolled and one quiz; returns the attempts base url
-async function setup(quizQuestions = questions) {
-    const classroom = await classroomModel.create({
-        className: 'Physics', courseCode: 'PHY1', professorId: professor.id, students: [student.id, otherStudent.id],
-    });
-    const quiz = await quizModel.create({ classroomId: classroom._id, title: 'Quiz 1', questions: quizQuestions });
-    return { classroom, quiz, base: `/classrooms/${classroom._id}/quizzes/${quiz._id}/attempts` };
-}
-
-const start = (base, user = student) => request(app).post(base).set(auth(user));
+useTestDatabase();
 
 describe('GET .../attempts/mine', () => {
     test('returns the quiz without correct or sample answers, and attempt null before starting', async () => {
@@ -94,9 +63,17 @@ describe('POST .../attempts/:id/submit', () => {
         expect(res.body.status).toBe('submitted');
         expect(res.body.submittedAt).toBeDefined();
         expect(res.body.totalScoreAwarded).toBe(2);
-        expect(res.body.answers[0]).toMatchObject({ isCorrect: true, pointsAwarded: 2 });
-        expect(res.body.answers[1]).toMatchObject({ isCorrect: false, pointsAwarded: 0 });
-        expect(res.body.answers[2]).toMatchObject({ responseText: 'Things fall down', pointsAwarded: 0 });
+        const saved = await attemptModel.findById(attempt._id);
+        expect(saved.answers[0]).toMatchObject({ isCorrect: true, pointsAwarded: 2 });
+        expect(saved.answers[1]).toMatchObject({ isCorrect: false, pointsAwarded: 0 });
+        expect(saved.answers[2]).toMatchObject({ responseText: 'Things fall down', pointsAwarded: 0 });
+
+        // The student only sees the total, not which choices were wrong
+        res.body.answers.slice(0, 2).forEach((a) => {
+            expect(a.isCorrect).toBeUndefined();
+            expect(a.pointsAwarded).toBeUndefined();
+        });
+        expect(res.body.answers[0].selectedOptionIndex).toBe(1);
     });
 
     test('marks the attempt graded when there are no open responses, and counts missing answers as wrong', async () => {
@@ -110,8 +87,9 @@ describe('POST .../attempts/:id/submit', () => {
         expect(res.body.status).toBe('graded');
         expect(res.body.totalScoreAwarded).toBe(2);
         expect(res.body.answers).toHaveLength(2);
-        expect(res.body.answers[1]).toMatchObject({ isCorrect: false, pointsAwarded: 0 });
-        expect(res.body.answers[1].selectedOptionIndex).toBeUndefined();
+        const saved = await attemptModel.findById(attempt._id);
+        expect(saved.answers[1]).toMatchObject({ isCorrect: false, pointsAwarded: 0 });
+        expect(saved.answers[1].selectedOptionIndex).toBeUndefined();
     });
 
     test('ignores out-of-range choices', async () => {
@@ -119,7 +97,8 @@ describe('POST .../attempts/:id/submit', () => {
         const { body: attempt } = await start(base);
         const res = await request(app).post(`${base}/${attempt._id}/submit`).set(auth(student))
             .send({ answers: [{ questionId: quiz.questions[0].questionId, selectedOptionIndex: 7 }] });
-        expect(res.body.answers[0]).toMatchObject({ isCorrect: false, pointsAwarded: 0 });
+        expect(res.body.totalScoreAwarded).toBe(0);
+        expect((await attemptModel.findById(attempt._id)).answers[0]).toMatchObject({ isCorrect: false, pointsAwarded: 0 });
     });
 
     test('rejects a second submit with 409', async () => {
@@ -147,9 +126,45 @@ describe('GET /classrooms/:id/quizzes for students', () => {
 
         await start(base);
         const { body } = await request(app).get(listUrl).set(auth(student));
-        expect(body[0].myAttempt).toEqual({ status: 'in_progress', totalScoreAwarded: 0, totalPointsPossible: 8 });
+        expect(body[0]).toMatchObject({ myAttempt: null, inProgress: true, attemptsUsed: 1, maxAttempts: 1 });
 
         expect((await request(app).get(listUrl).set(auth(otherStudent))).body[0].myAttempt).toBeNull();
         expect((await request(app).get(listUrl).set(auth(professor))).body[0].myAttempt).toBeUndefined();
+    });
+});
+
+describe('AI and professor score totals in the quiz list', () => {
+
+    const submitAll = async (base) => {
+        const { body: attempt } = await start(base);
+        const { body: quiz } = await request(app).get(`${base}/mine`).set(auth(student));
+        // Right on multiple choice (2 pts), wrong on true/false (0 pts), any open response
+        const answers = [
+            { questionId: quiz.quiz.questions[0].questionId, selectedOptionIndex: 1 },
+            { questionId: quiz.quiz.questions[1].questionId, selectedOptionIndex: 0 },
+            ...(quiz.quiz.questions[2] ? [{ questionId: quiz.quiz.questions[2].questionId, responseText: 'Things fall' }] : []),
+        ];
+        await request(app).post(`${base}/${attempt._id}/submit`).set(auth(student)).send({ answers });
+        return attempt;
+    };
+    const myAttempt = async (classroom) =>
+        (await request(app).get(`/classrooms/${classroom._id}/quizzes`).set(auth(student))).body[0].myAttempt;
+
+    test('without open responses, both totals are the auto-graded score', async () => {
+        const { classroom, base } = await setup(questions.slice(0, 2));
+        await submitAll(base);
+        expect(await myAttempt(classroom)).toMatchObject({ aiScoreAwarded: 2, professorScoreAwarded: 2, professorReviewed: true, totalPointsPossible: 3 });
+    });
+
+    test('the AI total waits for AI scores; the professor total is a running score until every open response is marked', async () => {
+        const { classroom, base } = await setup();
+        const attempt = await submitAll(base);
+        expect(await myAttempt(classroom)).toMatchObject({ aiScoreAwarded: null, professorScoreAwarded: 2, professorReviewed: false }); // running score: open response counts 0 for now
+
+        await attemptModel.updateOne({ _id: attempt._id }, { $set: { 'answers.2.aiScore': 4 } });
+        expect(await myAttempt(classroom)).toMatchObject({ aiScoreAwarded: 6, professorScoreAwarded: 2, professorReviewed: false });
+
+        await attemptModel.updateOne({ _id: attempt._id }, { $set: { 'answers.2.professorScore': 3 } });
+        expect(await myAttempt(classroom)).toMatchObject({ aiScoreAwarded: 6, professorScoreAwarded: 5, professorReviewed: true });
     });
 });

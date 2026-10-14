@@ -90,6 +90,21 @@ const quizSchema = new mongoose.Schema(
       type: Number,
       min: 1,
     },
+    // Optional due date. Students can't start the quiz after it, and a quiz in progress submits itself then.
+    dueAt: Date,
+    // Drafts (false) are hidden from students and may be unfinished; they're only checked when published.
+    // Quizzes saved before drafts existed have no value and count as published.
+    published: {
+      type: Boolean,
+      default: true,
+    },
+    // How many times each student may take the quiz. Their best score counts.
+    maxAttempts: {
+      type: Number,
+      min: [1, 'Students need at least 1 attempt'],
+      max: [20, 'Allow 20 attempts at most'],
+      default: 1,
+    },
     questions: [questionSchema],
   },
   { collection: "quizzes", timestamps: { createdAt: true, updatedAt: false } }
@@ -99,7 +114,8 @@ quizSchema.index({ classroomId: 1 });
 
 // Sum of every question's points, used to fill attempts.totalPointsPossible
 quizSchema.virtual('totalPoints').get(function () {
-  return this.questions.reduce((sum, q) => sum + q.points, 0);
+  // Drafts can have questions with no points yet
+  return this.questions.reduce((sum, q) => sum + (q.points || 0), 0);
 });
 
 module.exports = mongoose.model('quizzes', quizSchema)

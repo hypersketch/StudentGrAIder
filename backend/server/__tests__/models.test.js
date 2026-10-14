@@ -1,17 +1,28 @@
 const mongoose = require('mongoose');
 const { connect, disconnect, clearDB } = require('./testSetup');
+const userModel = require('../models/userModel');
 const classroomModel = require('../models/classroomModel');
 const quizModel = require('../models/quizModel');
 const attemptModel = require('../models/attemptModel');
 
 beforeAll(async () => {
     await connect();
+    await userModel.syncIndexes();
     await classroomModel.syncIndexes();
 });
 afterAll(async () => { await disconnect(); });
 beforeEach(async () => { await clearDB(); });
 
 const id = () => new mongoose.Types.ObjectId();
+
+describe('users', () => {
+    const user = (name, email) => ({ name, email, password: 'hash', role: 'student' });
+
+    test('rejects a second user with the same name in any case', async () => {
+        await userModel.create(user('Ada Lovelace', 'a@example.com'));
+        await expect(userModel.create(user('ADA lovelace', 'b@example.com'))).rejects.toThrow(/duplicate key/);
+    });
+});
 
 describe('classrooms', () => {
     test('saves with professorId, students and createdAt', async () => {

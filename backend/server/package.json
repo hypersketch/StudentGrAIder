@@ -26,6 +26,7 @@
     "i": "^0.3.7",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^6.6.5",
+    "nodemailer": "10.0.12",
     "zod": "^3.19.1"
   },
   "devDependencies": {

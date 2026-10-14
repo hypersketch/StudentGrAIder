@@ -35,15 +35,13 @@ describe('POST /user/dev-login', () => {
         expect(await userModel.countDocuments()).toBe(1);
     });
 
-    test('enrolls the test student in every class, from any professor, only once', async () => {
+    test('does not put the test student in any class', async () => {
         const professor = jwt.decode((await devLogin('professor')).body.accessToken);
         await classroomModel.create({ className: 'Test', courseCode: 'T1', professorId: professor.id });
         await classroomModel.create({ className: 'Other', courseCode: 'T2', professorId: new mongoose.Types.ObjectId() });
         await devLogin('student');
-        const student = jwt.decode((await devLogin('student')).body.accessToken);
         const classes = await classroomModel.find();
-        expect(classes).toHaveLength(2);
-        classes.forEach((c) => expect(c.students.map(String)).toEqual([student.id]));
+        classes.forEach((c) => expect(c.students).toEqual([]));
     });
 
     test('rejects any other role with 400', async () => {

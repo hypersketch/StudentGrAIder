@@ -4,6 +4,7 @@ const { userLoginValidation } = require('../models/userValidator')
 const userModel = require('../models/userModel')
 const bcrypt = require('bcrypt')
 const { generateAccessToken } = require('../utilities/generateToken')
+const { verifyToken } = require('../middleware/auth')
 
 router.post('/login', async (req, res) => {
     const { error } = userLoginValidation(req.body);
@@ -20,6 +21,18 @@ router.post('/login', async (req, res) => {
 
         const accessToken = generateAccessToken(user._id, user.email, user.name, user.role)
         res.header('Authorization', accessToken).send({ accessToken })
+    } catch (err) {
+        res.status(500).send({ message: "Internal server error" })
+    }
+})
+
+// Swaps a login that's still valid for a fresh one, so active users aren't logged out partway through a long quiz.
+// Looks the user up again, so a deleted account can't keep itself logged in.
+router.post('/refresh-token', verifyToken, async (req, res) => {
+    try {
+        const user = await userModel.findById(req.user.id)
+        if (!user) return res.status(401).send({ message: "This account no longer exists" })
+        res.send({ accessToken: generateAccessToken(user._id, user.email, user.name, user.role) })
     } catch (err) {
         res.status(500).send({ message: "Internal server error" })
     }

@@ -38,9 +38,28 @@ describe('POST /user/signup', () => {
         expect(res.status).toBe(409);
     });
 
-    test('allows two users with the same name', async () => {
+    test('rejects duplicate name with 409', async () => {
         await request(app).post('/user/signup').send(validUser);
         const res = await request(app).post('/user/signup').send({ ...validUser, email: 'other@example.com' });
+        expect(res.status).toBe(409);
+        expect(res.body.message).toMatch(/name is already taken/i);
+    });
+
+    test('treats names as case- and spacing-insensitive for duplicates', async () => {
+        await request(app).post('/user/signup').send(validUser);
+        const res = await request(app).post('/user/signup').send({ ...validUser, name: '  test   USER ', email: 'other@example.com' });
+        expect(res.status).toBe(409);
+    });
+
+    test('collapses extra spaces in the saved name', async () => {
+        const res = await request(app).post('/user/signup').send({ ...validUser, name: '  Test    User  ' });
+        expect(res.status).toBe(200);
+        expect(res.body.name).toBe('Test User');
+    });
+
+    test('allows names that differ by more than case or spacing', async () => {
+        await request(app).post('/user/signup').send(validUser);
+        const res = await request(app).post('/user/signup').send({ ...validUser, name: 'Test User B', email: 'other@example.com' });
         expect(res.status).toBe(200);
     });
 

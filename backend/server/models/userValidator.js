@@ -21,5 +21,24 @@ const userLoginValidation = data => {
   return loginValidationSchema.safeParse(data)
 };
 
+//validate a "forgot password" request
+const forgotPasswordValidation = data => {
+  const forgotPasswordSchema = z.object({
+    email: z.string().email('Please Input a valid email'),
+  });
+  return forgotPasswordSchema.safeParse(data)
+};
+
+//validate choosing a new password from a reset link
+const resetPasswordValidation = data => {
+  const resetPasswordSchema = z.object({
+    token: z.string().min(1, 'This reset link is invalid or has expired'),
+    password: z.string().min(8, 'Password must be 8 or more characters'),
+  });
+  return resetPasswordSchema.safeParse(data)
+};
+
 module.exports.userValidation = userValidation;
 module.exports.userLoginValidation = userLoginValidation;
+module.exports.forgotPasswordValidation = forgotPasswordValidation;
+module.exports.resetPasswordValidation = resetPasswordValidation;

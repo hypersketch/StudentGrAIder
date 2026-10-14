@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import getUserInfo from '../../utilities/decodeJwt';
 import api, { errorMessage } from '../../utilities/api';
+import { formatDue, isPastDue, toDueInputs, fromDueInputs } from '../../utilities/dueDate';
 
 const MAX_OPTIONS = 6;
 const MIN_OPTIONS = 2;
@@ -43,6 +44,10 @@ const findProblems = (title, questions) => {
 const fromServer = (quiz) => ({
     title: quiz.title,
     timeLimit: quiz.timeLimitMinutes ? String(quiz.timeLimitMinutes) : '',
+    maxAttempts: String(quiz.maxAttempts || 1),
+    dueDate: toDueInputs(quiz.dueAt).date,
+    dueTime: toDueInputs(quiz.dueAt).time,
+    published: quiz.published !== false,
     questions: quiz.questions.map((q) => ({
         key: nextKey++,
         questionId: q.questionId,
@@ -78,12 +83,18 @@ const QuizMakerPage = () => {
     const [loadError, setLoadError] = useState('');
     const [title, setTitle] = useState('');
     const [timeLimit, setTimeLimit] = useState('');
+    const [maxAttempts, setMaxAttempts] = useState('1');
+    const [dueDate, setDueDate] = useState('');
+    const [dueTime, setDueTime] = useState('');
+    // Students who already submitted; edits only apply to attempts started after saving
+    const [submittedStudents, setSubmittedStudents] = useState(0);
     const [questions, setQuestions] = useState(() => (isNew ? [newQuestion('multiple_choice')] : []));
     // Last saved version of an existing quiz, restored by "Cancel"
     const [saved, setSaved] = useState();
     const [editing, setEditing] = useState(isNew);
     const [problems, setProblems] = useState([]);
-    const [saving, setSaving] = useState(false);
+    // Which button is saving: 'draft', 'publish', or null
+    const [saving, setSaving] = useState(null);
 
     const isProfessor = user?.role === 'professor';
     const loading = !isNew && !saved && !loadError;
@@ -91,6 +102,9 @@ const QuizMakerPage = () => {
     const loadForm = (form) => {
         setTitle(form.title);
         setTimeLimit(form.timeLimit);
+        setMaxAttempts(form.maxAttempts);
+        setDueDate(form.dueDate);
+        setDueTime(form.dueTime);
         setQuestions(form.questions);
     };
 
@@ -110,6 +124,7 @@ const QuizMakerPage = () => {
         api.get(`/classrooms/${classId}/quizzes/${quizId}`)
             .then(({ data }) => {
                 const form = fromServer(data);
+                setSubmittedStudents(data.submittedStudents || 0);
                 setSaved(form);
                 loadForm(form);
             })
@@ -126,24 +141,47 @@ const QuizMakerPage = () => {
     const removeQuestion = (key) => setQuestions((prev) => prev.filter((q) => q.key !== key));
     const addQuestion = (type) => setQuestions((prev) => [...prev, newQuestion(type)]);
 
+    // Deletes the quiz and every student's attempts on it, then goes back to the class
+    const deleteQuiz = async () => {
+        const scores = submittedStudents > 0
+            ? ` ${submittedStudents} student${submittedStudents === 1 ? ' has' : 's have'} taken it, and their scores will be deleted too.`
+            : '';
+        if (!window.confirm(`Delete "${saved?.title || 'this quiz'}"?${scores} This can't be undone.`)) return;
+        setSaving('delete');
+        try {
+            await api.delete(`/classrooms/${classId}/quizzes/${quizId}`);
+            navigate(backTo);
+        } catch (err) {
+            setProblems([errorMessage(err)]);
+            setSaving(null);
+        }
+    };
+
     const cancelEditing = () => {
         loadForm(saved);
         setProblems([]);
         setEditing(false);
     };
 
-    const handleSave = async () => {
-        const found = findProblems(title, questions);
+    const isPublished = !isNew && saved?.published;
+
+    // publish: true checks everything and shows the quiz to students. A draft only needs a name and stays hidden.
+    const handleSave = async (publish) => {
+        const found = publish ? findProblems(title, questions) : title.trim() ? [] : ['Give the quiz a name.'];
         setProblems(found);
         if (found.length) return;
+        if (!publish && isPublished && !window.confirm('Students will stop seeing this quiz until you publish it again. Save it as a draft?')) return;
 
         const body = {
             title: title.trim(),
             timeLimitMinutes: timeLimit ? Number(timeLimit) : null,
+            maxAttempts: Number(maxAttempts) || 1,
+            dueAt: fromDueInputs(dueDate, dueTime),
+            published: publish,
             questions: questions.map(toPayload),
         };
 
-        setSaving(true);
+        setSaving(publish ? 'publish' : 'draft');
         try {
             if (isNew) {
                 await api.post(`/classrooms/${classId}/quizzes`, body);
@@ -158,7 +196,7 @@ const QuizMakerPage = () => {
         } catch (err) {
             setProblems([errorMessage(err)]);
         }
-        setSaving(false);
+        setSaving(null);
     };
 
     const heading = isNew ? 'New quiz' : editing ? 'Editing quiz' : saved?.title || 'Quiz';
@@ -171,7 +209,7 @@ const QuizMakerPage = () => {
                     ← Back to classes
                 </Link>
                 <h1 className="text-[1.4em] font-bold text-center my-auto">
-                    {heading}{classroom && ` — ${classroom.courseCode} ${classroom.className}`}
+                    {heading}{classroom && ` - ${classroom.courseCode} ${classroom.className}`}
                 </h1>
             </header>
 
@@ -218,6 +256,13 @@ const QuizMakerPage = () => {
                             <h2 className="w-full max-w-xl text-center text-[1.3em] font-bold py-2 m-0">{title}</h2>
                         )}
 
+                        {editing && submittedStudents > 0 && (
+                            <p className="w-full max-w-xl m-0 px-3 py-2 rounded-[3px] border border-[rgb(233,73,73)] bg-red-50 text-sm text-grader-text">
+                                <strong>{submittedStudents} student{submittedStudents === 1 ? ' has' : 's have'} already submitted this quiz.</strong>{' '}
+                                Changes only apply to attempts started after you save. Submitted attempts keep the questions and points they had.
+                            </p>
+                        )}
+
                         {questions.length === 0 && (
                             <p className="text-grader-muted">Add a question from the left sidebar.</p>
                         )}
@@ -254,26 +299,95 @@ const QuizMakerPage = () => {
                             <p id="time-limit" className="text-sm text-grader-text mb-4">{timeLimit || 'No limit'}</p>
                         )}
 
+                        <label className="block text-sm font-bold text-grader-muted mb-1" htmlFor="max-attempts">
+                            Attempts allowed
+                        </label>
+                        {editing ? (
+                            <input
+                                id="max-attempts"
+                                type="number"
+                                min="1"
+                                max="20"
+                                value={maxAttempts}
+                                onChange={(e) => setMaxAttempts(e.target.value)}
+                                className="w-full px-2 py-1 border border-grader-border rounded-[3px] mb-4"
+                            />
+                        ) : (
+                            <p id="max-attempts" className="text-sm text-grader-text mb-4">{maxAttempts}</p>
+                        )}
+
+                        <label className="block text-sm font-bold text-grader-muted mb-1" htmlFor="due-date">
+                            Due date
+                        </label>
+                        {editing ? (
+                            <div className="mb-4">
+                                {/* type="date" opens the browser's calendar when clicked */}
+                                <input
+                                    id="due-date"
+                                    type="date"
+                                    value={dueDate}
+                                    onChange={(e) => {
+                                        setDueDate(e.target.value);
+                                        if (e.target.value && !dueTime) setDueTime('23:59');
+                                    }}
+                                    className="w-full px-2 py-1 border border-grader-border rounded-[3px] mb-1"
+                                />
+                                <input
+                                    type="time"
+                                    aria-label="Time due"
+                                    value={dueTime}
+                                    disabled={!dueDate}
+                                    onChange={(e) => setDueTime(e.target.value)}
+                                    className="w-full px-2 py-1 border border-grader-border rounded-[3px] disabled:opacity-60"
+                                />
+                                {dueDate && (
+                                    <button
+                                        type="button"
+                                        onClick={() => { setDueDate(''); setDueTime(''); }}
+                                        className="mt-1 text-xs text-grader-muted hover:text-grader-navy underline"
+                                    >
+                                        Remove due date
+                                    </button>
+                                )}
+                            </div>
+                        ) : (
+                            <p id="due-date" className="text-sm text-grader-text mb-4">
+                                {dueDate ? formatDue(fromDueInputs(dueDate, dueTime)) : 'No due date'}
+                                {dueDate && isPastDue(fromDueInputs(dueDate, dueTime)) && ' (closed)'}
+                            </p>
+                        )}
+
                         <p className="text-sm text-grader-text mb-1">
                             {questions.length} question{questions.length === 1 ? '' : 's'}
                         </p>
-                        <p className="text-sm text-grader-text mb-4">{totalPoints} total points</p>
+                        <p className="text-sm text-grader-text mb-1">{totalPoints} total points</p>
+                        <p className="text-sm text-grader-text mb-4">
+                            {isPublished ? 'Published - students can see it' : 'Draft - hidden from students'}
+                        </p>
 
                         {editing ? (
                             <>
                                 <button
                                     type="button"
-                                    onClick={handleSave}
-                                    disabled={saving}
+                                    onClick={() => handleSave(false)}
+                                    disabled={!!saving}
+                                    className="w-full mb-2 py-2 rounded-[3px] border border-grader-border bg-white text-grader-text font-bold disabled:opacity-60"
+                                >
+                                    {saving === 'draft' ? 'Saving…' : 'Save as draft'}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleSave(true)}
+                                    disabled={!!saving}
                                     className="w-full py-2 rounded-[3px] bg-grader-green hover:brightness-110 text-white font-bold disabled:opacity-60"
                                 >
-                                    {saving ? 'Saving…' : isNew ? 'Save quiz' : 'Save changes'}
+                                    {saving === 'publish' ? 'Publishing…' : isPublished ? 'Publish changes' : 'Publish quiz'}
                                 </button>
                                 {!isNew && (
                                     <button
                                         type="button"
                                         onClick={cancelEditing}
-                                        disabled={saving}
+                                        disabled={!!saving}
                                         className="w-full mt-2 py-2 rounded-[3px] border border-grader-border bg-white text-grader-text font-bold"
                                     >
                                         Cancel
@@ -281,13 +395,29 @@ const QuizMakerPage = () => {
                                 )}
                             </>
                         ) : (
-                            <button
-                                type="button"
-                                onClick={() => setEditing(true)}
-                                className="w-full py-2 rounded-[3px] bg-grader-green hover:brightness-110 text-white font-bold"
-                            >
-                                Edit quiz
-                            </button>
+                            <>
+                                <button
+                                    type="button"
+                                    onClick={() => setEditing(true)}
+                                    className="w-full py-2 rounded-[3px] bg-grader-green hover:brightness-110 text-white font-bold"
+                                >
+                                    Edit quiz
+                                </button>
+                                <Link
+                                    to={`/classes/${classId}/quizzes/${quizId}/grade`}
+                                    className="block w-full mt-2 py-2 rounded-[3px] border border-grader-border bg-white text-grader-text text-center font-bold no-underline hover:text-grader-navy"
+                                >
+                                    Grade submissions
+                                </Link>
+                                <button
+                                    type="button"
+                                    onClick={deleteQuiz}
+                                    disabled={!!saving}
+                                    className="w-full mt-2 py-2 rounded-[3px] bg-[rgb(233,73,73)] hover:brightness-110 text-white font-bold disabled:opacity-60"
+                                >
+                                    Delete quiz
+                                </button>
+                            </>
                         )}
 
                         {problems.length > 0 && (
@@ -379,7 +509,7 @@ const QuestionCard = ({ number, question: q, readOnly, onChange, onDelete }) => 
                 <textarea
                     value={q.sampleAnswer}
                     onChange={(e) => onChange({ sampleAnswer: e.target.value })}
-                    placeholder="Sample full-credit answer (optional) — the AI grader compares student answers against this"
+                    placeholder="Sample full-credit answer (optional) - the AI grader compares student answers against this"
                     aria-label={`Question ${number} sample answer`}
                     rows={3}
                     className="w-full bg-grader-mint text-black placeholder-gray-700 py-2 px-3 rounded-[3px] resize-y focus:outline-none"

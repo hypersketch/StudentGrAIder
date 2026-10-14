@@ -3,7 +3,6 @@ const router = express.Router();
 const crypto = require("crypto");
 const bcrypt = require("bcrypt");
 const userModel = require('../models/userModel')
-const classroomModel = require('../models/classroomModel')
 const { generateAccessToken } = require('../utilities/generateToken')
 
 // FOR TESTING ONLY. server.js mounts this router only when ENABLE_DEV_LOGIN=true.
@@ -26,14 +25,11 @@ router.post('/dev-login', async (req, res) => {
             user = await userModel.create({ ...account, password, role })
         }
 
-        // Put the test student in every class (from any professor) so there's something to see
-        if (role === 'student') {
-            await classroomModel.updateMany({}, { $addToSet: { students: user._id } })
-        }
-
+        // The test student joins classes like anyone else: search, request, professor approves
         const accessToken = generateAccessToken(user._id, user.email, user.name, user.role)
         res.send({ accessToken })
     } catch (err) {
+        if (err.code === 11000) return res.status(409).send({ message: `A real account is already using the name "${account.name}"` })
         res.status(500).send({ message: "Internal server error" })
     }
 })
