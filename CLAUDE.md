@@ -25,6 +25,12 @@ DB_URL=mongodb+srv://<user>:<pass>@cluster0.<id>.mongodb.net/<dbname>
 ACCESS_TOKEN_SECRET=<random secret>
 ```
 
+Optional, for AI grading of open responses (`utilities/aiGrader.js`). Without a key, AI grading is off and professors grade by hand.
+```
+ANTHROPIC_API_KEY=<key from console.anthropic.com>
+AI_GRADER_MODEL=claude-opus-5-5   # optional; this is the default
+```
+
 Optional, for password reset emails (`utilities/mailer.js`). Without `SMTP_HOST`, emails go to a free Ethereal test inbox: nothing is delivered, and the backend logs a preview link instead.
 ```
 SMTP_HOST=smtp.example.com

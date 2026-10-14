@@ -1,5 +1,6 @@
 const attemptModel = require('../models/attemptModel')
 const quizModel = require('../models/quizModel')
+const { queueAIGrading } = require('./aiGrading')
 
 // Extra time after the deadline for answers already on their way (slow connections, the browser's own auto-submit)
 const GRACE_MS = 20 * 1000
@@ -78,7 +79,11 @@ const finishAttempt = async (attempt, quiz, answers, { autoSubmitted = false } =
             $unset: { savedAnswers: 1 },
         }
     )
-    return modifiedCount ? attemptModel.findById(attempt._id) : null
+    if (!modifiedCount) return null
+
+    // Open responses get a first-pass AI score in the background (when AI grading is set up)
+    if (quiz.questions.some((q) => q.type === 'open_response')) queueAIGrading(attempt._id)
+    return attemptModel.findById(attempt._id)
 }
 
 // Submits every attempt whose time ran out, using the answers saved before the deadline.

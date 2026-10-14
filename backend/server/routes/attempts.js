@@ -4,6 +4,8 @@ const router = express.Router({ mergeParams: true });
 const attemptModel = require('../models/attemptModel')
 const userModel = require('../models/userModel')
 const { deadlineFor, isPastDeadline, cleanAnswers, finishAttempt, finishExpiredAttempts } = require('../utilities/finishAttempt')
+const { isAiGradingEnabled } = require('../utilities/aiGrader')
+const { gradeAttemptWithAI } = require('../utilities/aiGrading')
 const { verifyToken, requireStudent, requireProfessor } = require('../middleware/auth')
 const { loadClassroom, loadQuiz, isEnrolled, isOwner } = require('../middleware/loaders')
 
@@ -169,12 +171,16 @@ router.get('/', ...ownerOnly, async (req, res) => {
     }
 })
 
-// Professor marks one open-response answer correct (full points) or incorrect (0). Body: { correct: true | false }
+// Professor scores one open-response answer. Body: { points } for any score from 0 to the question's points
+// (partial credit, e.g. 2.5), or { correct: true | false } as a shortcut for full points or 0.
 // Can be changed later. Their score replaces the AI's for that answer.
 router.post('/:attemptId/answers/:questionId/review', ...ownerOnly, async (req, res) => {
     const { attemptId, questionId } = req.params
-    const { correct } = req.body
-    if (typeof correct !== 'boolean') return res.status(400).send({ message: "Say whether the answer is correct" })
+    const { correct, points: given } = req.body
+    const hasPoints = given !== undefined && given !== null && given !== ''
+    if (hasPoints ? !Number.isFinite(Number(given)) : typeof correct !== 'boolean') {
+        return res.status(400).send({ message: "Give the answer a score" })
+    }
     if (!mongoose.isValidObjectId(attemptId)) return res.status(404).send({ message: "Attempt not found" })
 
     try {
@@ -189,7 +195,13 @@ router.post('/:attemptId/answers/:questionId/review', ...ownerOnly, async (req, 
         const points = answer.points ?? req.quiz.questions.find((q) => String(q.questionId) === questionId)?.points
         if (points == null) return res.status(404).send({ message: "That question is no longer in the quiz" })
 
-        answer.professorScore = correct ? points : 0
+        let score = correct ? points : 0
+        if (hasPoints) {
+            score = Math.round(Number(given) * 100) / 100
+            if (score < 0 || score > points) return res.status(400).send({ message: `Score must be between 0 and ${points}` })
+        }
+
+        answer.professorScore = score
         answer.pointsAwarded = answer.professorScore
         answer.reviewedAt = new Date()
         attempt.totalScoreAwarded = attempt.answers.reduce((sum, a) => sum + a.pointsAwarded, 0)
@@ -199,6 +211,30 @@ router.post('/:attemptId/answers/:questionId/review', ...ownerOnly, async (req, 
 
         await attempt.save()
         res.send(attempt)
+    } catch (err) {
+        res.status(500).send({ message: "Internal server error" })
+    }
+})
+
+// Professor asks the AI to grade (or retry) any open responses on an attempt that don't have an AI score yet.
+// AI grading normally runs by itself after each submit; this is for retries and attempts from before it was set up.
+router.post('/:attemptId/ai-grade', ...ownerOnly, async (req, res) => {
+    if (!isAiGradingEnabled()) {
+        return res.status(409).send({ message: "AI grading isn't set up. Add ANTHROPIC_API_KEY to the backend's .env and restart it." })
+    }
+    const { attemptId } = req.params
+    if (!mongoose.isValidObjectId(attemptId)) return res.status(404).send({ message: "Attempt not found" })
+
+    try {
+        const attempt = await attemptModel.findOne({ _id: attemptId, quizId: req.quiz._id })
+        if (!attempt) return res.status(404).send({ message: "Attempt not found" })
+        if (attempt.status === 'in_progress') return res.status(409).send({ message: "This quiz hasn't been submitted yet" })
+
+        const { graded, errors } = await gradeAttemptWithAI(attempt._id)
+        if (errors.length && !graded) {
+            return res.status(502).send({ message: `The AI couldn't grade this attempt: ${errors[0]}` })
+        }
+        res.send(await attemptModel.findById(attempt._id))
     } catch (err) {
         res.status(500).send({ message: "Internal server error" })
     }

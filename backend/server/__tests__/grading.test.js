@@ -67,6 +67,39 @@ describe('professor grading open responses', () => {
         expect((await review(true, student)).status).toBe(403);
         expect((await request(app).get(base).set(auth(student))).status).toBe(403);
     });
+
+    // Scores the open response (5 points possible) with a number instead of correct / incorrect
+    const score = async (points) => {
+        const ctx = await submitted();
+        const url = `${ctx.base}/${ctx.attempt._id}/answers/${ctx.quiz.questions[2].questionId}/review`;
+        const send = (body) => request(app).post(url).set(auth(professor)).send(body);
+        return { ...ctx, res: await send({ points }), send };
+    };
+
+    test("partial points: any score from 0 to the question's points, decimals included", async () => {
+        const { res, send } = await score(2.5);
+        expect(res.status).toBe(200);
+        expect(res.body.answers[2]).toMatchObject({ professorScore: 2.5, pointsAwarded: 2.5 });
+        expect(res.body.totalScoreAwarded).toBe(4.5); // 2 from multiple choice + 2.5
+        expect(res.body.status).toBe('graded');
+
+        expect((await send({ points: 0 })).body.answers[2].professorScore).toBe(0);
+        expect((await send({ points: '5' })).body.answers[2].professorScore).toBe(5);
+    });
+
+    test("partial points show up in the student's running score", async () => {
+        const { classroom } = await score(3);
+        const { body } = await request(app).get(`/classrooms/${classroom._id}/quizzes`).set(auth(student));
+        expect(body[0].myAttempt).toMatchObject({ professorScoreAwarded: 5, professorReviewed: true, totalPointsPossible: 8 });
+    });
+
+    test("rejects scores below 0, above the question's points, or not a number", async () => {
+        const { res, send } = await score(6);
+        expect(res.status).toBe(400);
+        expect(res.body.message).toMatch(/between 0 and 5/);
+        expect((await send({ points: -1 })).status).toBe(400);
+        expect((await send({ points: 'lots' })).status).toBe(400);
+    });
 });
 
 describe('editing a quiz after students submit', () => {

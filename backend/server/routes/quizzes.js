@@ -6,6 +6,7 @@ const { verifyToken, requireProfessor } = require('../middleware/auth')
 const { loadClassroom, loadQuiz, isOwner, isEnrolled } = require('../middleware/loaders')
 const { scoreTotals, bestSubmitted } = require('../utilities/grades')
 const { finishExpiredAttempts } = require('../utilities/finishAttempt')
+const { isAiGradingEnabled } = require('../utilities/aiGrader')
 
 // Checks the parts of a save request that the model can't. Drafts only need a name; publishing needs a question too.
 // Returns an error message, or null when the request is fine.
@@ -99,7 +100,11 @@ const countSubmittedStudents = async (quiz) =>
 router.get('/:quizId', verifyToken, requireProfessor, loadClassroom, loadQuiz, async (req, res) => {
     if (!isOwner(req)) return res.status(403).send({ message: "You do not have permission to do this" })
     try {
-        res.send({ ...req.quiz.toJSON(), submittedStudents: await countSubmittedStudents(req.quiz) })
+        res.send({
+            ...req.quiz.toJSON(),
+            submittedStudents: await countSubmittedStudents(req.quiz),
+            aiGradingEnabled: isAiGradingEnabled(),
+        })
     } catch (err) {
         res.status(500).send({ message: "Internal server error" })
     }

@@ -63,6 +63,11 @@ const GradeQuizPage = () => {
                                     ? `All ${attempts.length} submission${attempts.length === 1 ? ' is' : 's are'} graded.`
                                     : `${waiting} of ${attempts.length} submission${attempts.length === 1 ? '' : 's'} need grading.`}
                     </p>
+                    {anyOpen && !quiz.aiGradingEnabled && (
+                        <p className="w-full max-w-xl text-center text-xs text-grader-muted m-0">
+                            AI grading is off. Add ANTHROPIC_API_KEY to the backend's .env to get a first-pass AI score on every open response.
+                        </p>
+                    )}
 
                     {attempts.map((attempt) => (
                         <Submission
@@ -89,11 +94,25 @@ const Submission = ({ attempt, quiz, openAnswers, needsGrading, reviewUrl, onRev
     // Questions the professor added after this attempt was submitted. They don't count toward it.
     const addedLater = quiz.questions.filter((q) => !attempt.answers.some((a) => a.questionId === q.questionId)).length;
 
-    const mark = async (questionId, correct) => {
+    // body is { correct: true | false } for full points or 0, or { points } for partial credit
+    const mark = async (questionId, body) => {
         setSaving(true);
         setError('');
         try {
-            const { data } = await api.post(`${reviewUrl}/${questionId}/review`, { correct });
+            const { data } = await api.post(`${reviewUrl}/${questionId}/review`, body);
+            onReviewed(data);
+        } catch (err) {
+            setError(errorMessage(err));
+        }
+        setSaving(false);
+    };
+
+    // Asks the AI to grade any open responses on this attempt that it hasn't scored yet
+    const runAiGrading = async () => {
+        setSaving('ai');
+        setError('');
+        try {
+            const { data } = await api.post(`${reviewUrl.replace(/\/answers$/, '')}/ai-grade`);
             onReviewed(data);
         } catch (err) {
             setError(errorMessage(err));
@@ -127,6 +146,18 @@ const Submission = ({ attempt, quiz, openAnswers, needsGrading, reviewUrl, onRev
                 </p>
             )}
 
+            {/* AI grading runs by itself after each submit; this retries it or catches up older attempts */}
+            {quiz.aiGradingEnabled && openAnswers.some((a) => a.aiScore == null) && (
+                <button
+                    type="button"
+                    onClick={runAiGrading}
+                    disabled={saving}
+                    className="mt-3 px-2.5 py-1 rounded-[3px] border border-grader-navy text-grader-navy text-sm font-bold hover:bg-grader-navy hover:text-white disabled:opacity-60"
+                >
+                    {saving === 'ai' ? 'AI is grading…' : 'Run AI grading'}
+                </button>
+            )}
+
             {openAnswers.length > 0 && (
                 <div className="flex flex-col gap-4 mt-4">
                     {openAnswers.map((a) => {
@@ -134,7 +165,10 @@ const Submission = ({ attempt, quiz, openAnswers, needsGrading, reviewUrl, onRev
                         const q = questionFor(a.questionId);
                         const text = a.text ?? q?.text;
                         const points = a.points ?? q?.points;
-                        const decision = a.professorScore == null ? null : a.professorScore > 0;
+                        // true = full points, false = 0, 'partial' = anything in between, null = not graded yet
+                        const decision = a.professorScore == null
+                            ? null
+                            : a.professorScore >= points ? true : a.professorScore === 0 ? false : 'partial';
                         return (
                             <div key={a.questionId} className="bg-grader-navy text-white rounded-md p-4">
                                 <div className="flex items-center justify-between mb-2 text-sm">
@@ -152,34 +186,58 @@ const Submission = ({ attempt, quiz, openAnswers, needsGrading, reviewUrl, onRev
                                         <p className="mb-3 text-sm text-white/90 whitespace-pre-wrap">{q.sampleAnswer}</p>
                                     </>
                                 )}
-                                {a.aiScore != null && decision == null && (
-                                    <p className="mb-3 text-sm text-white/90">AI score: {a.aiScore} / {points}</p>
+                                {/* The AI's first pass: a suggestion until the professor gives their own score */}
+                                {a.aiScore != null && (
+                                    <div className="mb-3 px-3 py-2 rounded-[3px] bg-white/10 text-sm">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <span className="font-bold">AI score: {a.aiScore} / {points}</span>
+                                            {a.professorScore !== a.aiScore && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => mark(a.questionId, { points: a.aiScore })}
+                                                    disabled={saving}
+                                                    className="px-2 py-0.5 rounded-[3px] bg-white text-grader-navy text-xs font-bold disabled:opacity-60"
+                                                >
+                                                    Use AI score
+                                                </button>
+                                            )}
+                                        </div>
+                                        {a.aiFeedback && <p className="mt-1 mb-0 text-white/90">{a.aiFeedback}</p>}
+                                    </div>
                                 )}
 
                                 <div className="grid grid-cols-2 gap-3">
                                     <button
                                         type="button"
-                                        onClick={() => mark(a.questionId, true)}
+                                        onClick={() => mark(a.questionId, { correct: true })}
                                         disabled={saving}
                                         aria-pressed={decision === true}
                                         className={`py-1.5 rounded-[3px] bg-grader-mint text-black hover:brightness-110 disabled:opacity-60 ${
-                                            decision === true ? 'ring-2 ring-white font-bold' : decision === false ? 'opacity-50' : ''
+                                            decision === true ? 'ring-2 ring-white font-bold' : decision != null ? 'opacity-50' : ''
                                         }`}
                                     >
                                         ✓ Correct
                                     </button>
                                     <button
                                         type="button"
-                                        onClick={() => mark(a.questionId, false)}
+                                        onClick={() => mark(a.questionId, { correct: false })}
                                         disabled={saving}
                                         aria-pressed={decision === false}
                                         className={`py-1.5 rounded-[3px] bg-[rgb(233,73,73)] text-white hover:brightness-110 disabled:opacity-60 ${
-                                            decision === false ? 'ring-2 ring-white font-bold' : decision === true ? 'opacity-50' : ''
+                                            decision === false ? 'ring-2 ring-white font-bold' : decision != null ? 'opacity-50' : ''
                                         }`}
                                     >
                                         ✗ Incorrect
                                     </button>
                                 </div>
+                                <PointsInput
+                                    id={`points-${attempt._id}-${a.questionId}`}
+                                    score={a.professorScore}
+                                    points={points}
+                                    partial={decision === 'partial'}
+                                    saving={saving}
+                                    onSave={(value) => mark(a.questionId, { points: value })}
+                                />
                             </div>
                         );
                     })}
@@ -188,6 +246,46 @@ const Submission = ({ attempt, quiz, openAnswers, needsGrading, reviewUrl, onRev
 
             {error && <p className="mt-3 mb-0 text-sm text-red-600">{error}</p>}
         </div>
+    );
+};
+
+// Partial credit: type any score from 0 to the question's points (decimals allowed) and press Save or Enter.
+// Shows the current score, whichever way it was given.
+const PointsInput = ({ id, score, points, partial, saving, onSave }) => {
+    const current = score == null ? '' : String(score);
+    const [value, setValue] = useState(current);
+    useEffect(() => setValue(current), [current]);
+    const changed = value.trim() !== '' && value !== current;
+
+    return (
+        <form
+            onSubmit={(e) => {
+                e.preventDefault();
+                if (changed) onSave(Number(value));
+            }}
+            className="flex items-center gap-2 mt-3 text-sm"
+        >
+            <label htmlFor={id} className="text-white/80">Points</label>
+            <input
+                id={id}
+                type="number"
+                min="0"
+                max={points}
+                step="any"
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                className={`w-20 px-2 py-1 rounded-[3px] text-black ${partial ? 'ring-2 ring-white font-bold' : ''}`}
+            />
+            <span>/ {points}</span>
+            <button
+                type="submit"
+                disabled={!changed || saving}
+                className="px-2 py-1 rounded-[3px] bg-white text-grader-navy font-bold disabled:opacity-50"
+            >
+                Save
+            </button>
+            {partial && <span className="text-white/80">Partial credit</span>}
+        </form>
     );
 };
 
