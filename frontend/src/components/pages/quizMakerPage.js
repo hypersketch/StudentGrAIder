@@ -88,7 +88,7 @@ const QuizMakerPage = () => {
     const [dueTime, setDueTime] = useState('');
     // Students who already submitted; edits only apply to attempts started after saving
     const [submittedStudents, setSubmittedStudents] = useState(0);
-    const [questions, setQuestions] = useState(() => (isNew ? [newQuestion('multiple_choice')] : []));
+    const [questions, setQuestions] = useState([]);
     // Last saved version of an existing quiz, restored by "Cancel"
     const [saved, setSaved] = useState();
     const [editing, setEditing] = useState(isNew);

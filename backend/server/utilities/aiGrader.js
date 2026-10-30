@@ -4,7 +4,8 @@ dotenv.config();
 
 // Grades one open-response answer with Claude. Turned on by setting ANTHROPIC_API_KEY in .env.
 // The AI score is a first pass: it shows in the AI box and counts until the professor gives their own score.
-const MODEL = process.env.AI_GRADER_MODEL || 'claude-opus-5-5'
+// Haiku is fast and cheap, which suits grading many short answers.
+const MODEL = process.env.AI_GRADER_MODEL || 'claude-haiku-5-5'
 
 const isAiGradingEnabled = () => !!process.env.ANTHROPIC_API_KEY
 
@@ -62,7 +63,8 @@ const gradeOpenResponse = async ({ question, sampleAnswer, points, response }) =
         `<student_answer>\n${response}\n</student_answer>`,
     ].join('\n\n')
 
-    const message = await getClient().beta.messages.create({
+    // Haiku has no server-side refusal fallback, so a refusal below just leaves the answer for the professor
+    const message = await getClient().messages.create({
         model: MODEL,
         max_tokens: 16000,
         system: SYSTEM_PROMPT,
@@ -71,9 +73,6 @@ const gradeOpenResponse = async ({ question, sampleAnswer, points, response }) =
             effort: 'medium',
             format: { type: 'json_schema', schema: GRADE_SCHEMA },
         },
-        // If a safety check wrongly flags an answer, retry on Anthropic's recommended fallback model instead of failing
-        betas: ['server-side-fallback-2026-07-01'],
-        fallbacks: 'default',
     })
 
     if (message.stop_reason === 'refusal') throw new Error('The AI declined to grade this answer')
