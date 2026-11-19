@@ -181,7 +181,11 @@ ANTHROPIC_API_KEY=<key from console.anthropic.com>
 GMAIL_USER=you@gmail.com
 GMAIL_APP_PASSWORD=<16-character app password>
 
-# Or any other SMTP server instead of Gmail. With neither set, emails go to a free Ethereal test inbox
+# Or Brevo (free, sends over HTTPS; needed on hosts that block email ports, like Render's free plan).
+# MAIL_FROM must be a sender you verified in Brevo. Brevo wins over Gmail when both are set.
+# BREVO_API_KEY=<key from Brevo: SMTP & API > API keys>
+
+# Or any other SMTP server. With none of these set, emails go to a free Ethereal test inbox
 # (nothing is delivered; the app shows a link to read each email).
 SMTP_HOST=smtp.example.com
 SMTP_PORT=587
@@ -212,6 +216,29 @@ With `ENABLE_DEV_LOGIN=true`, the login box has **Test professor** and **Test st
 
 ---
 
+## Deploying for free (Render)
+
+`render.yaml` sets up both apps on Render's free plan: the backend as a web service and the frontend as a static site. The database stays on MongoDB Atlas.
+
+1. **Atlas:** Network Access > Add IP Address > Allow access from anywhere (`0.0.0.0/0`). Render's address changes, so Atlas can't list it.
+2. **Brevo** (for password reset emails; Render's free plan blocks Gmail's email ports): sign up at brevo.com, verify your sender address under Senders, and create an API key under SMTP & API > API keys.
+3. **Render:** push the repo to GitHub, then New > Blueprint and pick the repo. Fill in the values it asks for:
+
+   | Setting | Value |
+   |---|---|
+   | `DB_URL` | Your Atlas connection string |
+   | `BREVO_API_KEY` | The Brevo key |
+   | `MAIL_FROM` | `Student GrAIder <your verified sender>` |
+   | `FRONTEND_URL` | `https://studentgraider.onrender.com` |
+   | `ANTHROPIC_API_KEY` | Blank to grade by hand (AI grading is billed per use) |
+   | `REACT_APP_BACKEND_SERVER_URI` | `https://studentgraider-api.onrender.com` |
+
+4. Once both are live, check the real URLs on the Render dashboard. If Render added a suffix because a name was taken, fix `FRONTEND_URL` (backend) and `REACT_APP_BACKEND_SERVER_URI` (frontend, then redeploy it, since the URL is built into the site).
+
+On the free plan the backend sleeps after about 15 minutes without visitors, and the first request after that takes up to a minute. Timed quizzes stay fair: attempts whose time ran out are submitted the next time anyone loads quizzes or grades. Don't set `ENABLE_DEV_LOGIN` on Render.
+
+---
+
 ## Testing
 
 ```bash
@@ -219,7 +246,7 @@ cd backend/server
 npm test
 ```
 
-155 backend tests run against an in-memory MongoDB, so they need no `.env` or internet connection. The AI grader and email sender are replaced with fakes, so tests never call paid services or send real email.
+171 backend tests run against an in-memory MongoDB, so they need no `.env` or internet connection. The AI grader and email sender are replaced with fakes, so tests never call paid services or send real email.
 
 Each test file covers one feature (`timer.test.js`, `drafts.test.js`, `grading.test.js`, ...). Every test follows the same pattern: set up a situation, call the API as a given user, and check the response.
 

@@ -1,0 +1,49 @@
+# Render Blueprint: the backend as a free web service and the frontend as a free static site.
+# In Render: New > Blueprint, pick this repo. Render asks for each "sync: false" value once.
+services:
+  # Backend API (Express). URL: https://studentgraider-api.onrender.com, or with a suffix if that name is taken.
+  - type: web
+    name: studentgraider-api
+    runtime: node
+    plan: free
+    rootDir: backend/server
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # MongoDB Atlas connection string, same as DB_URL in backend/server/.env
+      - key: DB_URL
+        sync: false
+      # Signs login tokens; Render makes a random one
+      - key: ACCESS_TOKEN_SECRET
+        generateValue: true
+      # Password reset emails. Render's free plan blocks email ports, so this uses Brevo instead of Gmail.
+      - key: BREVO_API_KEY
+        sync: false
+      # A sender verified in Brevo, e.g. Student GrAIder <you@gmail.com>
+      - key: MAIL_FROM
+        sync: false
+      # The frontend's URL, so reset links open the live site, e.g. https://studentgraider.onrender.com
+      - key: FRONTEND_URL
+        sync: false
+      # Optional AI grading (billed by Anthropic per use). Leave blank to grade by hand.
+      - key: ANTHROPIC_API_KEY
+        sync: false
+
+  # Frontend (React). URL: https://studentgraider.onrender.com, or with a suffix if that name is taken.
+  - type: web
+    name: studentgraider
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./build
+    # Send every page address to the React app, so links like /reset-password?token=... work when opened directly
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      # The backend's URL, e.g. https://studentgraider-api.onrender.com (no slash at the end)
+      - key: REACT_APP_BACKEND_SERVER_URI
+        sync: false

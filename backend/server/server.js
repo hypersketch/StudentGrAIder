@@ -21,7 +21,8 @@ require('./models/quizModel')
 require('./models/attemptModel')
 
 require('dotenv').config();
-const SERVER_PORT = 8081
+// Hosts like Render pick the port and pass it in PORT; 8081 when running locally
+const SERVER_PORT = process.env.PORT || 8081
 
 dbConnection()
 app.use(cors({origin: '*'}))
@@ -49,6 +50,6 @@ setInterval(() => {
 
 app.listen(SERVER_PORT, (req, res) => {
     console.log(`The backend service is running on port ${SERVER_PORT} and waiting for requests.`);
-    const mailNote = { gmail: `from Gmail (${process.env.GMAIL_USER})`, smtp: `through ${process.env.SMTP_HOST}`, test: 'to the Ethereal test inbox (not delivered; set GMAIL_USER and GMAIL_APP_PASSWORD to send real email)' }
+    const mailNote = { brevo: 'through Brevo', gmail: `from Gmail (${process.env.GMAIL_USER})`, smtp: `through ${process.env.SMTP_HOST}`, test: 'to the Ethereal test inbox (not delivered; set GMAIL_USER and GMAIL_APP_PASSWORD to send real email)' }
     console.log(`Password reset emails are sent ${mailNote[mailMode()]}.`)
 })

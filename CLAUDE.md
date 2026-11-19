@@ -37,7 +37,7 @@ ANTHROPIC_API_KEY=<key from console.anthropic.com>
 AI_GRADER_MODEL=claude-haiku-5-5   # optional; this is the default
 ```
 
-Optional, for password reset emails (`utilities/mailer.js`). Gmail (`GMAIL_USER` + `GMAIL_APP_PASSWORD`, an app password) wins over generic SMTP (`SMTP_HOST` etc.). With neither, emails go to a free Ethereal test inbox: nothing is delivered, and the backend logs a preview link instead. `node sendTestEmail.js <address>` checks the setup.
+Optional, for password reset emails (`utilities/mailer.js`). Order: Brevo (`BREVO_API_KEY`, HTTPS; used on Render, whose free plan blocks email ports; `MAIL_FROM` must be a verified sender), then Gmail (`GMAIL_USER` + `GMAIL_APP_PASSWORD`, an app password), then generic SMTP (`SMTP_HOST` etc.). With neither, emails go to a free Ethereal test inbox: nothing is delivered, and the backend logs a preview link instead. `node sendTestEmail.js <address>` checks the setup.
 ```
 SMTP_HOST=smtp.example.com
 SMTP_PORT=587
@@ -52,6 +52,9 @@ FRONTEND_URL=http://localhost:8096   # where the emailed reset link points
 ## Architecture
 
 **Two independent apps** - no monorepo tooling, no shared code. Install and run each folder separately.
+
+### Deployment
+`render.yaml` (repo root) is a Render Blueprint: backend as a free web service (`npm start`, port from `PORT`), frontend as a free static site with a rewrite of `/*` to `/index.html`. Steps are in README.md ("Deploying for free").
 
 ### Backend startup
 `server.js` requires the route files; each route file pulls in the models, middleware, and utilities it needs on first require (Node caches each file, so it loads once). Then `server.js` connects to MongoDB (`config/db.config.js`), mounts the routers, mounts `routes/devLogin.js` only if `ENABLE_DEV_LOGIN=true`, starts a once-a-minute `finishExpiredAttempts()` sweep, and listens on 8081.
@@ -87,7 +90,7 @@ Frontend `utilities/api.js` (axios, adds `Authorization: Bearer <token>`) -> rou
 - **Drafts are invisible to students** (quiz list filter + `requirePublished` on attempt routes) and skip validation until published.
 
 ## Conventions
-- **Tests:** one file per feature in `backend/server/__tests__/`. Quiz-related files share `quizFixtures.js` (`useTestDatabase`, made-up users, `setup()`, `start()`). `testEnv.js` blanks `ANTHROPIC_API_KEY`, `SMTP_HOST` and the `GMAIL_*` settings so tests never call paid services; mock `utilities/aiGrader` and `utilities/mailer` with `jest.mock`. Add tests for every new route, including the 401/403/404 cases.
+- **Tests:** one file per feature in `backend/server/__tests__/`. Quiz-related files share `quizFixtures.js` (`useTestDatabase`, made-up users, `setup()`, `start()`). `testEnv.js` blanks `ANTHROPIC_API_KEY`, `SMTP_HOST`, `BREVO_API_KEY` and the `GMAIL_*` settings so tests never call paid services; mock `utilities/aiGrader` and `utilities/mailer` with `jest.mock`. Add tests for every new route, including the 401/403/404 cases.
 - **Errors:** routes answer `{ message }` with a status code; the frontend shows it via `errorMessage(err)`.
 - **No em dashes** in UI text, comments, or docs - use a plain hyphen.
 - **Line endings:** files are CRLF in the working tree (git `core.autocrlf=true`, LF in the repo). Keep CRLF when editing.
