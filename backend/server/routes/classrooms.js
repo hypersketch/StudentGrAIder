@@ -4,6 +4,8 @@ const router = express.Router();
 const classroomModel = require('../models/classroomModel')
 const { DEFAULT_STUDENT_LIMIT } = classroomModel
 const userModel = require('../models/userModel')
+const quizModel = require('../models/quizModel')
+const attemptModel = require('../models/attemptModel')
 const { classroomValidation, classroomSettingsValidation } = require('../models/classroomValidator')
 const { verifyToken, requireProfessor, requireStudent } = require('../middleware/auth')
 const { loadClassroom, isOwner, isEnrolled } = require('../middleware/loaders')
@@ -169,6 +171,19 @@ router.patch('/:classroomId', verifyToken, requireProfessor, loadClassroom, requ
         req.classroom.studentLimit = data.studentLimit
         await req.classroom.save()
         res.send(req.classroom)
+    } catch (err) {
+        res.status(500).send({ message: "Internal server error" })
+    }
+})
+
+// Professor deletes a class along with its quizzes and every student's attempts on them, so all its grades are gone too
+router.delete('/:classroomId', verifyToken, requireProfessor, loadClassroom, requireOwner, async (req, res) => {
+    try {
+        const quizIds = await quizModel.find({ classroomId: req.classroom._id }).distinct('_id')
+        const { deletedCount: attemptsDeleted } = await attemptModel.deleteMany({ quizId: { $in: quizIds } })
+        const { deletedCount: quizzesDeleted } = await quizModel.deleteMany({ classroomId: req.classroom._id })
+        await classroomModel.deleteOne({ _id: req.classroom._id })
+        res.send({ message: "Class deleted", quizzesDeleted, attemptsDeleted })
     } catch (err) {
         res.status(500).send({ message: "Internal server error" })
     }

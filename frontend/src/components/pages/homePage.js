@@ -32,6 +32,7 @@ const HomePage = () => {
     // Student's overall grade in the selected class: { overall, grades }
     const [myGrades, setMyGrades] = useState(null);
     const [showNewClass, setShowNewClass] = useState(false);
+    const [showDeleteAccount, setShowDeleteAccount] = useState(false);
     const [searchParams, setSearchParams] = useSearchParams();
 
     const isProfessor = user?.role === 'professor';
@@ -95,6 +96,27 @@ const HomePage = () => {
         }
     };
 
+    // Professor deletes the selected class with all its quizzes and grades. Typing "Delete" guards against a misclick.
+    const deleteClass = async () => {
+        const { courseCode, className } = selectedClass;
+        const typed = window.prompt(
+            `Delete ${courseCode} - ${className}? Every quiz, student attempt and grade in this class will be deleted, and students lose access. This can't be undone.\n\nType Delete to confirm.`
+        );
+        if (typed === null) return;
+        if (typed.trim() !== 'Delete') {
+            window.alert('You didn\'t type "Delete", so nothing was deleted.');
+            return;
+        }
+        try {
+            await api.delete(`/classrooms/${selectedId}`);
+            setClasses((prev) => prev.filter((c) => c._id !== selectedId));
+            setSearchParams({});
+        } catch (err) {
+            handleError(err);
+            window.alert(errorMessage(err));
+        }
+    };
+
     return (
         <div className="flex min-h-screen bg-white font-sans">
             {/* Sidebar */}
@@ -148,10 +170,15 @@ const HomePage = () => {
                     </button>
                 )}
 
-                {!isProfessor && (
-                    <h3 className="mt-auto text-center text-base font-bold text-grader-muted">
-                        Contact My Professor
-                    </h3>
+                {/* mt-auto pushes this to the bottom of the sidebar */}
+                {user && (
+                    <button
+                        type="button"
+                        onClick={() => setShowDeleteAccount(true)}
+                        className="mt-auto pt-5 text-left text-sm text-grader-muted hover:text-red-600 hover:underline"
+                    >
+                        Delete account
+                    </button>
                 )}
             </aside>
 
@@ -190,17 +217,24 @@ const HomePage = () => {
                                 {isProfessor && (
                                     <div className="flex items-center gap-2">
                                         <Link
-                                            to={`/classes/${selectedClass._id}/gradebook`}
-                                            className="px-2.5 py-1.5 rounded-[3px] border border-grader-border bg-white text-grader-text text-sm font-bold no-underline hover:text-grader-navy"
-                                        >
-                                            Gradebook
-                                        </Link>
-                                        <Link
                                             to={`/classes/${selectedClass._id}/quizzes/new`}
                                             className="px-2.5 py-1.5 rounded-[3px] bg-grader-green text-white text-sm font-bold no-underline hover:text-white"
                                         >
                                             + Create quiz
                                         </Link>
+                                        <Link
+                                            to={`/classes/${selectedClass._id}/gradebook`}
+                                            className="px-2.5 py-1.5 rounded-[3px] border border-grader-border bg-white text-grader-text text-sm font-bold no-underline hover:text-grader-navy"
+                                        >
+                                            Gradebook
+                                        </Link>
+                                        <button
+                                            type="button"
+                                            onClick={deleteClass}
+                                            className="px-2.5 py-1.5 rounded-[3px] border border-grader-border bg-white text-grader-text text-sm font-bold hover:text-[rgb(233,73,73)]"
+                                        >
+                                            Delete class
+                                        </button>
                                     </div>
                                 )}
                                 {!isProfessor && (
@@ -295,6 +329,13 @@ const HomePage = () => {
 
             {showNewClass && (
                 <NewClassOverlay onClose={() => setShowNewClass(false)} onCreated={handleClassCreated} />
+            )}
+            {showDeleteAccount && (
+                <DeleteAccountOverlay
+                    isProfessor={isProfessor}
+                    onClose={() => setShowDeleteAccount(false)}
+                    onDeleted={() => { setShowDeleteAccount(false); setSearchParams({}); logOut(); }}
+                />
             )}
         </div>
     );
@@ -597,6 +638,58 @@ const NewClassOverlay = ({ onClose, onCreated }) => {
                 </div>
                 {error && <p className="text-red-600 text-sm m-0">{error}</p>}
                 <button type="submit" className={overlaySubmit}>Create class</button>
+            </form>
+        </Overlay>
+    );
+};
+
+// Deletes the logged-in user's account after they re-enter their password
+const DeleteAccountOverlay = ({ isProfessor, onClose, onDeleted }) => {
+    const [password, setPassword] = useState('');
+    const [error, setError] = useState('');
+    const [deleting, setDeleting] = useState(false);
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setDeleting(true);
+        try {
+            await api.delete('/user/me', { data: { password } });
+            onDeleted();
+        } catch (err) {
+            setError(errorMessage(err));
+            setDeleting(false);
+        }
+    };
+
+    return (
+        <Overlay title="Delete account" onClose={onClose}>
+            <form onSubmit={handleSubmit} className="space-y-4 p-5">
+                <p className="text-sm text-grader-text m-0">
+                    {isProfessor
+                        ? 'Every class you own will be deleted, along with its quizzes and all student attempts and grades.'
+                        : 'All your quiz attempts and grades will be deleted, and you will leave every class.'}
+                    {' '}This can't be undone.
+                </p>
+                <div>
+                    <label htmlFor="delete-password" className={overlayLabel}>Enter your password to confirm</label>
+                    <input
+                        id="delete-password"
+                        type="password"
+                        autoComplete="current-password"
+                        autoFocus
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className={overlayInput}
+                    />
+                </div>
+                {error && <p className="text-red-600 text-sm m-0">{error}</p>}
+                <button
+                    type="submit"
+                    disabled={!password || deleting}
+                    className="w-full py-2 rounded-[3px] bg-red-600 hover:brightness-110 text-white font-bold disabled:opacity-60"
+                >
+                    {deleting ? 'Deleting...' : 'Delete my account'}
+                </button>
             </form>
         </Overlay>
     );

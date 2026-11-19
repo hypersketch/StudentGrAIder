@@ -5,3 +5,5 @@ process.env.ACCESS_TOKEN_SECRET = 'test-access-token-secret'
 process.env.ANTHROPIC_API_KEY = ''
 // Never send real email from tests either
 process.env.SMTP_HOST = ''
+process.env.GMAIL_USER = ''
+process.env.GMAIL_APP_PASSWORD = ''

@@ -39,7 +39,7 @@ Built with the MERN stack: MongoDB, Express, React, and Node.js.
 | Backend | Node.js (20+), Express 4, Mongoose 6, zod (input validation), bcrypt, jsonwebtoken |
 | Database | MongoDB Atlas |
 | AI grading | Claude API via `@anthropic-ai/sdk` (model: Claude Opus 5.5) |
-| Email | Nodemailer (Ethereal test inbox by default, or any SMTP server) |
+| Email | Nodemailer (Gmail, any SMTP server, or an Ethereal test inbox by default) |
 | Testing | Jest, supertest, mongodb-memory-server (in-memory database) |
 
 ---
@@ -175,7 +175,13 @@ ENABLE_DEV_LOGIN=true
 # AI grading of open responses. Without a key, professors grade by hand.
 ANTHROPIC_API_KEY=<key from console.anthropic.com>
 
-# Real email for password resets. Without SMTP_HOST, emails go to a free Ethereal test inbox
+# Real email for password resets, sent from a Gmail account. GMAIL_APP_PASSWORD is an app password
+# (Google Account > Security > App passwords; needs 2-Step Verification), not your Gmail password.
+# Check it with: node sendTestEmail.js you@example.com
+GMAIL_USER=you@gmail.com
+GMAIL_APP_PASSWORD=<16-character app password>
+
+# Or any other SMTP server instead of Gmail. With neither set, emails go to a free Ethereal test inbox
 # (nothing is delivered; the app shows a link to read each email).
 SMTP_HOST=smtp.example.com
 SMTP_PORT=587
@@ -230,10 +236,12 @@ All routes except signup, login, and password reset need an `Authorization: Bear
 | POST | `/user/refresh-token` | logged in | Swap a valid token for a fresh one |
 | POST | `/user/forgot-password` | anyone | Email a password reset link |
 | POST | `/user/reset-password` | anyone | Set a new password from a reset link |
+| DELETE | `/user/me` | logged in | Delete your own account (needs password). Professors' classes, quizzes and attempts go with it; students' attempts are deleted and they leave every class |
 | POST | `/classrooms` | professor | Create a class |
 | GET | `/classrooms` | logged in | Your classes (taught or enrolled) |
 | GET | `/classrooms/search?q=` | student | Search classes by code, name, or professor |
 | PATCH | `/classrooms/:id` | owner | Change the student limit |
+| DELETE | `/classrooms/:id` | owner | Delete the class with all its quizzes and attempts |
 | POST | `/classrooms/:id/join-requests` | student | Ask to join |
 | GET | `/classrooms/:id/join-requests` | owner | Students waiting to join |
 | POST | `/classrooms/:id/join-requests/:studentId/approve` | owner | Approve (fails if the class is full) |

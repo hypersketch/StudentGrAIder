@@ -1,6 +1,6 @@
-// Students dropping a class and professors deleting a quiz
+// Students dropping a class and professors deleting a quiz or a class
 const {
-    useTestDatabase,
+    useTestDatabase, mongoose,
     request, app, classroomModel, quizModel, attemptModel, tokenFor, professor, student, otherStudent, auth, questions, setup, start,
 } = require('./quizFixtures');
 
@@ -52,5 +52,52 @@ describe('deleting a quiz', () => {
         expect((await request(app).delete(url).set(auth(student))).status).toBe(403);
         expect((await request(app).delete(url).set(auth(tokenFor('professor')))).status).toBe(403);
         expect(await quizModel.findById(quiz._id)).not.toBeNull();
+    });
+});
+
+describe('deleting a class', () => {
+    test('professor deletes a class with its quizzes and attempts; other classes are untouched', async () => {
+        const { classroom, quiz, base } = await setup();
+        await start(base);
+        await start(base, otherStudent);
+        await quizModel.create({ classroomId: classroom._id, title: 'Draft', questions: [] });
+
+        const keptClass = await classroomModel.create({ className: 'Chemistry', courseCode: 'CHE1', professorId: professor.id, students: [student.id] });
+        const keptQuiz = await quizModel.create({ classroomId: keptClass._id, title: 'Kept', questions: questions.slice(0, 1) });
+        await start(`/classrooms/${keptClass._id}/quizzes/${keptQuiz._id}/attempts`);
+
+        const res = await request(app).delete(`/classrooms/${classroom._id}`).set(auth(professor));
+        expect(res.status).toBe(200);
+        expect(res.body).toMatchObject({ quizzesDeleted: 2, attemptsDeleted: 2 });
+        expect(await classroomModel.findById(classroom._id)).toBeNull();
+        expect(await quizModel.countDocuments({ classroomId: classroom._id })).toBe(0);
+        expect(await attemptModel.countDocuments({ quizId: quiz._id })).toBe(0);
+
+        expect(await classroomModel.findById(keptClass._id)).not.toBeNull();
+        expect(await quizModel.findById(keptQuiz._id)).not.toBeNull();
+        expect(await attemptModel.countDocuments({ quizId: keptQuiz._id })).toBe(1);
+
+        // Gone for everyone afterwards
+        const { body: list } = await request(app).get('/classrooms').set(auth(student));
+        expect(list.map((c) => c.courseCode)).toEqual(['CHE1']);
+        expect((await request(app).get(`/classrooms/${classroom._id}/quizzes`).set(auth(student))).status).toBe(404);
+    });
+
+    test('needs a login', async () => {
+        const { classroom } = await setup();
+        expect((await request(app).delete(`/classrooms/${classroom._id}`)).status).toBe(401);
+    });
+
+    test('only the owning professor can delete', async () => {
+        const { classroom } = await setup();
+        const url = `/classrooms/${classroom._id}`;
+        expect((await request(app).delete(url).set(auth(student))).status).toBe(403);
+        expect((await request(app).delete(url).set(auth(tokenFor('professor')))).status).toBe(403);
+        expect(await classroomModel.findById(classroom._id)).not.toBeNull();
+    });
+
+    test('unknown class is 404', async () => {
+        const res = await request(app).delete(`/classrooms/${new mongoose.Types.ObjectId()}`).set(auth(professor));
+        expect(res.status).toBe(404);
     });
 });

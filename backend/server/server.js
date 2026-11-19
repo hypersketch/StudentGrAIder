@@ -4,12 +4,14 @@ const cors = require('cors')
 const loginRoute = require('./routes/userLogin')
 const registerRoute = require('./routes/userSignUp')
 const passwordResetRoute = require('./routes/passwordReset')
+const deleteAccountRoute = require('./routes/deleteAccount')
 const classroomsRoute = require('./routes/classrooms')
 const quizzesRoute = require('./routes/quizzes')
 const attemptsRoute = require('./routes/attempts')
 const gradesRoute = require('./routes/grades')
 const dbConnection = require('./config/db.config')
 const { finishExpiredAttempts } = require('./utilities/finishAttempt')
+const { mailMode } = require('./utilities/mailer')
 
 // Load every model at startup so Mongoose creates its collection and indexes,
 // even before a route uses it
@@ -27,6 +29,7 @@ app.use(express.json())
 app.use('/user', loginRoute)
 app.use('/user', registerRoute)
 app.use('/user', passwordResetRoute)
+app.use('/user', deleteAccountRoute)
 app.use('/classrooms', classroomsRoute)
 app.use('/classrooms/:classroomId/quizzes', quizzesRoute)
 app.use('/classrooms/:classroomId/quizzes/:quizId/attempts', attemptsRoute)
@@ -46,4 +49,6 @@ setInterval(() => {
 
 app.listen(SERVER_PORT, (req, res) => {
     console.log(`The backend service is running on port ${SERVER_PORT} and waiting for requests.`);
+    const mailNote = { gmail: `from Gmail (${process.env.GMAIL_USER})`, smtp: `through ${process.env.SMTP_HOST}`, test: 'to the Ethereal test inbox (not delivered; set GMAIL_USER and GMAIL_APP_PASSWORD to send real email)' }
+    console.log(`Password reset emails are sent ${mailNote[mailMode()]}.`)
 })
