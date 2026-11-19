@@ -246,7 +246,7 @@ cd backend/server
 npm test
 ```
 
-171 backend tests run against an in-memory MongoDB, so they need no `.env` or internet connection. The AI grader and email sender are replaced with fakes, so tests never call paid services or send real email.
+187 backend tests run against an in-memory MongoDB, so they need no `.env` or internet connection. The AI grader and email sender are replaced with fakes, so tests never call paid services or send real email.
 
 Each test file covers one feature (`timer.test.js`, `drafts.test.js`, `grading.test.js`, ...). Every test follows the same pattern: set up a situation, call the API as a given user, and check the response.
 
@@ -258,11 +258,13 @@ All routes except signup, login, and password reset need an `Authorization: Bear
 
 | Method | Path | Who | What it does |
 |---|---|---|---|
-| POST | `/user/signup` | anyone | Create an account |
+| POST | `/user/signup` | anyone | Create an account and email a verification link (login works once it's opened) |
 | POST | `/user/login` | anyone | Log in; returns a token |
 | POST | `/user/refresh-token` | logged in | Swap a valid token for a fresh one |
 | POST | `/user/forgot-password` | anyone | Email a password reset link |
 | POST | `/user/reset-password` | anyone | Set a new password from a reset link |
+| POST | `/user/verify-email` | anyone | Verify the email from the signup link; returns a token (logs in) |
+| POST | `/user/resend-verification` | anyone | Email a new verification link |
 | DELETE | `/user/me` | logged in | Delete your own account (needs password). Professors' classes, quizzes and attempts go with it; students' attempts are deleted and they leave every class |
 | POST | `/classrooms` | professor | Create a class |
 | GET | `/classrooms` | logged in | Your classes (taught or enrolled) |

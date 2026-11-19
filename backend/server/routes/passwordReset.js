@@ -95,6 +95,12 @@ router.post('/reset-password', async (req, res) => {
         user.password = await bcrypt.hash(req.body.password, 10)
         user.resetTokenHash = undefined
         user.resetTokenExpires = undefined
+        // Opening the emailed link also proves they own the email
+        if (user.emailVerified === false) {
+            user.emailVerified = true
+            user.verifyTokenHash = undefined
+            user.verifyTokenExpires = undefined
+        }
         await user.save()
         res.send({ message: "Your password has been reset. You can log in now." })
     } catch (err) {

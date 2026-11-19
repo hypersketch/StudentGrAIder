@@ -18,6 +18,10 @@ router.post('/login', async (req, res) => {
 
         const isPasswordValid = await bcrypt.compare(password, user.password)
         if (!isPasswordValid) return res.status(401).send({ message: "Email or password is incorrect" })
+        // Checked after the password, so this can't be used to find out which emails have accounts
+        if (user.emailVerified === false) {
+            return res.status(403).send({ message: "Verify your email first. Open the link we sent to your inbox.", unverified: true })
+        }
 
         const accessToken = generateAccessToken(user._id, user.email, user.name, user.role)
         res.header('Authorization', accessToken).send({ accessToken })

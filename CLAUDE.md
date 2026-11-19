@@ -87,6 +87,7 @@ Frontend `utilities/api.js` (axios, adds `Authorization: Bearer <token>`) -> rou
 - **Students never see which multiple choice / true-false answers were right** (`attemptForStudent` strips `isCorrect` and per-question points).
 - **Professor scores always beat AI scores.** `pointsAwarded` for an open response = `professorScore` if set, else `aiScore`. The P box is a running score (ungraded open responses count 0); `professorReviewed` says when it's final.
 - **Overall grade = average of quiz percentages** (equal weight), best attempt per quiz; past-due never-submitted quizzes count 0; drafts never count.
+- **Signup needs an email the person owns.** New accounts have `emailVerified: false` and login answers 403 `{ unverified: true }` until the emailed link is opened (`/user/verify-email`, which also logs them in). A TTL index on `verifyTokenExpires` deletes accounts not verified within 24 hours. Accounts with no `emailVerified` value (made before this, or by dev-login) count as verified. A password reset also verifies the email.
 - **Drafts are invisible to students** (quiz list filter + `requirePublished` on attempt routes) and skip validation until published.
 
 ## Conventions

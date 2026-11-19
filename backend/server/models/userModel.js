@@ -33,6 +33,12 @@ const userSchema = new mongoose.Schema(
     // Password reset: a hash of the emailed one-time token (never the token itself) and when it stops working
     resetTokenHash: String,
     resetTokenExpires: Date,
+    // Email verification: false until the person clicks the link emailed at signup, and login is refused until then.
+    // Accounts made before verification existed have no value and count as verified.
+    emailVerified: Boolean,
+    verifyTokenHash: String,
+    // An unverified account is deleted at this time (TTL index below); cleared once verified
+    verifyTokenExpires: Date,
   },
   { collection: "users", timestamps: { createdAt: true, updatedAt: false } }
 );
@@ -43,11 +49,16 @@ userSchema.set('toJSON', {
     delete ret.password;
     delete ret.resetTokenHash;
     delete ret.resetTokenExpires;
+    delete ret.verifyTokenHash;
+    delete ret.verifyTokenExpires;
     return ret;
   },
 });
 
 userSchema.index({ name: 1 }, { unique: true, collation: NAME_COLLATION });
+// MongoDB deletes accounts whose verification link ran out, so nobody can hold an email or name they don't own.
+// Verified accounts have no verifyTokenExpires, so they're never touched.
+userSchema.index({ verifyTokenExpires: 1 }, { expireAfterSeconds: 0 });
 
 const userModel = mongoose.model('users', userSchema)
 

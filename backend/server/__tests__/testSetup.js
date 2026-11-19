@@ -9,6 +9,7 @@ function buildApp() {
     app.use(express.json());
     app.use('/user', require('../routes/userLogin'));
     app.use('/user', require('../routes/userSignUp'));
+    app.use('/user', require('../routes/emailVerification'));
     app.use('/user', require('../routes/passwordReset'));
     app.use('/user', require('../routes/deleteAccount'));
     app.use('/classrooms', require('../routes/classrooms'));

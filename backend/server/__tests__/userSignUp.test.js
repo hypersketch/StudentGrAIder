@@ -1,7 +1,17 @@
 const request = require('supertest');
 const { buildApp, connect, disconnect, clearDB } = require('./testSetup');
 
+// Signup emails a verification link; capture it instead of sending
+jest.mock('../utilities/mailer', () => ({ sendMail: jest.fn(async () => null) }));
+
 const app = buildApp();
+const userModel = require('../models/userModel');
+
+// A verified account, as if its emailed link was opened
+const signupVerified = async (user) => {
+    await request(app).post('/user/signup').send(user);
+    await userModel.updateOne({ email: user.email.toLowerCase() }, { emailVerified: true });
+};
 
 beforeAll(async () => { await connect(); });
 afterAll(async () => { await disconnect(); });
@@ -26,14 +36,14 @@ describe('POST /user/signup', () => {
     });
 
     test('rejects duplicate email with 409', async () => {
-        await request(app).post('/user/signup').send(validUser);
+        await signupVerified(validUser);
         const res = await request(app).post('/user/signup').send({ ...validUser, name: 'Someone Else' });
         expect(res.status).toBe(409);
         expect(res.body.message).toMatch(/already exists/i);
     });
 
     test('treats emails as case-insensitive for duplicates', async () => {
-        await request(app).post('/user/signup').send(validUser);
+        await signupVerified(validUser);
         const res = await request(app).post('/user/signup').send({ ...validUser, email: 'TEST@Example.com' });
         expect(res.status).toBe(409);
     });

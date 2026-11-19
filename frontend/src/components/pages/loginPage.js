@@ -3,6 +3,7 @@ import { useNavigate, Link, Navigate } from "react-router-dom";
 import axios from "axios";
 import getUserInfo from "../../utilities/decodeJwt";
 import Overlay, { overlayInput, overlayLabel, overlaySubmit } from "../overlay";
+import ResendVerification from "../resendVerification";
 
 const url = `${process.env.REACT_APP_BACKEND_SERVER_URI}/user/login`;
 const devLoginUrl = `${process.env.REACT_APP_BACKEND_SERVER_URI}/user/dev-login`;
@@ -16,6 +17,8 @@ const Login = () => {
   const [user] = useState(() => getUserInfo());
   const [credentials, setCredentials] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
+  // True when the password was right but the email isn't verified yet
+  const [unverified, setUnverified] = useState(false);
   const navigate = useNavigate();
 
   const close = useCallback(() => navigate("/"), [navigate]);
@@ -32,6 +35,7 @@ const Login = () => {
       // Full reload so every component re-reads the new token
       window.location.assign("/");
     } catch (error) {
+      setUnverified(!!error.response?.data?.unverified);
       if (error.response && error.response.status >= 400 && error.response.status <= 500) {
         setError(error.response.data.message);
       }
@@ -69,6 +73,7 @@ const Login = () => {
         </div>
 
         {error && <p className="text-red-600 text-sm m-0">{error}</p>}
+        {unverified && <ResendVerification email={credentials.email} />}
 
         <button type="submit" className={overlaySubmit}>Log In</button>
 

@@ -2,6 +2,11 @@ const request = require('supertest');
 const jwt = require('jsonwebtoken');
 const { buildApp, connect, disconnect, clearDB } = require('./testSetup');
 
+const userModel = require('../models/userModel');
+
+// Signup emails a verification link; capture it instead of sending
+jest.mock('../utilities/mailer', () => ({ sendMail: jest.fn(async () => null) }));
+
 const app = buildApp();
 
 beforeAll(async () => { await connect(); });
@@ -15,8 +20,11 @@ const validUser = {
     role: 'student'
 };
 
+// Signs up and marks the email as verified, as if the emailed link was opened
 async function registerUser(overrides = {}) {
-    return request(app).post('/user/signup').send({ ...validUser, ...overrides });
+    const res = await request(app).post('/user/signup').send({ ...validUser, ...overrides });
+    await userModel.updateOne({ email: (overrides.email || validUser.email).toLowerCase() }, { emailVerified: true });
+    return res;
 }
 
 describe('POST /user/login', () => {

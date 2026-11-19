@@ -13,6 +13,7 @@ import GradeQuizPage from "./components/pages/gradeQuizPage";
 import GradebookPage from "./components/pages/gradebookPage";
 import ForgotPassword from "./components/pages/forgotPasswordPage";
 import ResetPassword from "./components/pages/resetPasswordPage";
+import VerifyEmail from "./components/pages/verifyEmailPage";
 import { createContext, useState, useEffect } from "react";
 import getUserInfo from "./utilities/decodeJwt";
 import { startSessionKeepAlive } from "./utilities/session";
@@ -40,6 +41,7 @@ const App = () => {
         <Route exact path="/signup" element={<><HomePage /><Signup /></>} />
         <Route exact path="/forgot-password" element={<><HomePage /><ForgotPassword /></>} />
         <Route exact path="/reset-password" element={<><HomePage /><ResetPassword /></>} />
+        <Route exact path="/verify-email" element={<><HomePage /><VerifyEmail /></>} />
         <Route exact path="/classes/:classId/gradebook" element={<GradebookPage />} />
         <Route exact path="/classes/:classId/quizzes/new" element={<QuizMakerPage />} />
         <Route exact path="/classes/:classId/quizzes/:quizId" element={<QuizMakerPage />} />

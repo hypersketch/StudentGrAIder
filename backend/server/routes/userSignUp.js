@@ -4,10 +4,12 @@ const bcrypt = require("bcrypt");
 const { userValidation } = require('../models/userValidator')
 const userModel = require('../models/userModel')
 const { NAME_COLLATION, normalizeName } = userModel
+const { sendVerificationEmail } = require('../utilities/emailVerification')
 
 const EMAIL_TAKEN = "An account with that email already exists"
 const NAME_TAKEN = "That name is already taken. Add a middle initial or last name to tell yourself apart."
 
+// Creates an unverified account and emails a link to the address. Login works once the link is opened.
 router.post('/signup', async (req, res) => {
     const { error } = userValidation(req.body);
     if (error) return res.status(400).send({ message: error.errors[0].message });
@@ -17,7 +19,9 @@ router.post('/signup', async (req, res) => {
 
     try {
         const existingUser = await userModel.findOne({ email: email.toLowerCase() })
-        if (existingUser) return res.status(409).send({ message: EMAIL_TAKEN })
+        // An account nobody verified yet doesn't hold the email: signing up again replaces it and sends a new link
+        if (existingUser?.emailVerified === false) await userModel.deleteOne({ _id: existingUser._id })
+        else if (existingUser) return res.status(409).send({ message: EMAIL_TAKEN })
 
         const existingName = await userModel.findOne({ name }).collation(NAME_COLLATION)
         if (existingName) return res.status(409).send({ message: NAME_TAKEN })
@@ -26,8 +30,18 @@ router.post('/signup', async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, salt)
 
         const newUser = new userModel({ name, email, password: hashedPassword, role })
-        const savedUser = await newUser.save()
-        res.send(savedUser)
+        let previewUrl
+        try {
+            previewUrl = await sendVerificationEmail(newUser)
+        } catch (err) {
+            // No email means no way to verify, so don't keep the account; they can just try again
+            console.log(`Could not send verification email: ${err.message}`)
+            if (newUser._id) await userModel.deleteOne({ _id: newUser._id, emailVerified: false })
+            if (err.code === 11000) throw err
+            return res.status(500).send({ message: "We couldn't send the verification email. Please try again later." })
+        }
+        if (previewUrl) console.log(`Verification email for ${newUser.email}: ${previewUrl}`)
+        res.send({ ...newUser.toJSON(), ...(previewUrl && { previewUrl }) })
     } catch (err) {
         // Two signups for the same name or email at the same moment: the unique index catches the second one
         if (err.code === 11000) return res.status(409).send({ message: err.keyPattern?.name ? NAME_TAKEN : EMAIL_TAKEN })
