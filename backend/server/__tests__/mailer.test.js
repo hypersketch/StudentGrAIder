@@ -53,6 +53,16 @@ describe('sending with Brevo', () => {
         expect(JSON.parse(global.fetch.mock.calls[0][1].body).sender).toEqual({ name: 'Student GrAIder', email: 'me@gmail.com' });
     });
 
+    test('MAIL_FROM without angle brackets, or a bare address, still works', async () => {
+        process.env.MAIL_FROM = 'Student GrAIder me@gmail.com';
+        await sendMail({ to: 'a@example.com', subject: 'Hi', text: 'x' });
+        expect(JSON.parse(global.fetch.mock.calls[0][1].body).sender).toEqual({ name: 'Student GrAIder', email: 'me@gmail.com' });
+
+        process.env.MAIL_FROM = 'me@gmail.com';
+        await sendMail({ to: 'a@example.com', subject: 'Hi', text: 'x' });
+        expect(JSON.parse(global.fetch.mock.calls[1][1].body).sender).toEqual({ email: 'me@gmail.com' });
+    });
+
     test('a Brevo error is thrown with its message', async () => {
         global.fetch = jest.fn(async () => ({ ok: false, status: 400, statusText: 'Bad Request', json: async () => ({ message: 'sender not valid' }) }));
         await expect(sendMail({ to: 'a@example.com', subject: 'Hi', text: 'x' })).rejects.toThrow('Brevo answered 400: sender not valid');

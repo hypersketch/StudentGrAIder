@@ -53,10 +53,11 @@ const fromAddress = () => {
     return gmailUser ? `Student GrAIder <${gmailUser}>` : 'Student GrAIder <no-reply@studentgraider.dev>'
 }
 
-// "Student GrAIder <me@gmail.com>" -> { name: 'Student GrAIder', email: 'me@gmail.com' }
+// "Student GrAIder <me@gmail.com>" -> { name: 'Student GrAIder', email: 'me@gmail.com' }.
+// Also accepts the brackets left off ("Student GrAIder me@gmail.com") or just "me@gmail.com".
 const parseAddress = (address) => {
-    const match = /^\s*(.*?)\s*<([^>]+)>\s*$/.exec(address)
-    return match ? { name: match[1] || undefined, email: match[2] } : { email: address.trim() }
+    const match = /^\s*(.*?)\s*<([^>]+)>\s*$/.exec(address) || /^\s*(.*?)\s*(\S+@\S+)\s*$/.exec(address)
+    return match ? { name: match[1] || undefined, email: match[2].trim() } : { email: address.trim() }
 }
 
 const BREVO_API = 'https://api.brevo.com/v3'
