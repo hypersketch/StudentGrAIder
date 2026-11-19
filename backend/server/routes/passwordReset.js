@@ -15,8 +15,7 @@ const hashToken = (token) => crypto.createHash('sha256').update(token).digest('h
 
 const recoveryEmail = (user, link) => {
     const text = [
-        'This is a test recovery from student GrAIder',
-        '',
+        
         `Hi ${user.name},`,
         '',
         `We received a request to reset the password for your Student GrAIder account (${user.email}).`,
@@ -35,7 +34,6 @@ const recoveryEmail = (user, link) => {
 
     const escape = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
     const html = `
-        <p><strong>This is a test recovery from student GrAIder</strong></p>
         <p>Hi ${escape(user.name)},</p>
         <p>We received a request to reset the password for your Student GrAIder account (${escape(user.email)}).</p>
         <p>To choose a new password:</p>

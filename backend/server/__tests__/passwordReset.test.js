@@ -31,9 +31,7 @@ describe('POST /user/forgot-password', () => {
 
         const email = sendMail.mock.calls[0][0];
         expect(email.to).toBe('sam@example.com');
-        expect(email.text.split('\n')[0]).toBe('This is a test recovery from student GrAIder');
         expect(email.text).toMatch(/Enter your new password twice/);
-        expect(email.html).toMatch(/This is a test recovery from student GrAIder/);
 
         // Only a hash of the token is stored
         const user = await userModel.findOne({ email: 'sam@example.com' });
