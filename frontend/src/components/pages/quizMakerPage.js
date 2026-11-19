@@ -405,7 +405,7 @@ const QuizMakerPage = () => {
                                 </button>
                                 <Link
                                     to={`/classes/${classId}/quizzes/${quizId}/grade`}
-                                    className="block w-full mt-2 py-2 rounded-[3px] border border-grader-border bg-white text-grader-text text-center font-bold no-underline hover:text-grader-navy"
+                                    className="block w-full mt-2 py-2 rounded-[3px] bg-grader-navy hover:brightness-125 text-white hover:text-white text-center font-bold no-underline"
                                 >
                                     Grade submissions
                                 </Link>

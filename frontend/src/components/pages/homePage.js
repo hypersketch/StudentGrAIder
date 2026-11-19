@@ -11,11 +11,11 @@ const card = 'border border-grader-text rounded-md p-[15px] mb-[15px] bg-white';
 
 // What a student can do next with a quiz, from the attempt summary the quiz list returns (nothing once out of tries)
 const nextStep = (quiz) => {
-    if (quiz.inProgress) return 'Resume →';
+    if (quiz.inProgress) return 'Resume quiz';
     if (isPastDue(quiz.dueAt)) return 'Closed';
-    if (!quiz.attemptsUsed) return 'Take quiz →';
+    if (!quiz.attemptsUsed) return 'Take quiz';
     const left = quiz.maxAttempts - quiz.attemptsUsed;
-    return left > 0 ? `Retake (${left} left) →` : null;
+    return left > 0 ? `Quiz Retake(s) (${left} left)` : null;
 };
 
 // The mint score boxes from Homepage.html
@@ -151,7 +151,7 @@ const HomePage = () => {
                             {isProfessor && c.pendingStudents?.length > 0 && (
                                 <span
                                     className="ml-1.5 px-1.5 rounded-full bg-grader-green text-white text-xs font-bold"
-                                    title="Students waiting to join"
+                                    title="Student(s) waiting to join"
                                 >
                                     {c.pendingStudents.length}
                                 </span>
